@@ -286,6 +286,19 @@ public class Verilog {
 		return( sb.toString() );
 	}
 
+	public ArrayList<String> getVerilogNetListWith( String new_module_name ) {
+		ArrayList<String> new_model = new ArrayList<String>();
+		for( String s: result ) {
+			if( s.matches("(\\s*module\\s+)\\S+(.*)") ) {
+				Matcher m = Pattern.compile("(\\s*module\\s+)\\S+(.*)").matcher(s);
+				if( m.matches() )
+					new_model.add(m.group(1)+new_module_name+m.group(2));
+			} else {
+				new_model.add(s);
+			}
+		}
+		return new_model;
+	}
 
 	public String getModuleName() {
 		Matcher modname_match = modname_regex.matcher(module_definition);
@@ -303,6 +316,9 @@ public class Verilog {
 	}
 	public PrimaryPinName getPp_names() {
 		return pp_names;
+	}
+	public ArrayList<String> getVerilogNetList() {
+		return result;
 	}
 
 

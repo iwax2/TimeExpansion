@@ -44,6 +44,7 @@ public class TimeExpansion {
 			tem.expandWithBroadSide();
 		} else { // skewedloadはそのうち書く
 		}
-		tem.print();
+//		tem.printVerilog();
+		tem.writeVerilog( conf.getOutput_file() );
 	}
 }

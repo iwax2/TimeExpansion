@@ -83,21 +83,26 @@ public class TimeExpansionModel {
 		}
 		module_definition.delete(module_definition.length()-2, module_definition.length());
 		module_definition.append(" );");
-		System.out.println(Verilog.clearLine80(module_definition.toString()));
+		expanded.add(Verilog.clearLine80(module_definition.toString()));
 		for( String s: input_definition ) {
-			System.out.println(s);
+			expanded.add(s);
 		}
 		for( String s: output_definition ) {
-			System.out.println(s);
+			expanded.add(s);
 		}
 		for( String s: wire_definition ) {
-			System.out.println(s);
+			expanded.add(s);
 		}
 		for( String s: ccs_definition ) {
+			expanded.add(s);
+		}
+		expanded.add("endmodule");
+	}
+
+	public void print() {
+		for( String s : expanded ) {
 			System.out.println(s);
 		}
-
-		System.out.println("endmodule");
 	}
 
 }

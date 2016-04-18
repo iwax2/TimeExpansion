@@ -44,5 +44,6 @@ public class TimeExpansion {
 			tem.expandWithBroadSide();
 		} else { // skewedloadはそのうち書く
 		}
+		tem.print();
 	}
 }

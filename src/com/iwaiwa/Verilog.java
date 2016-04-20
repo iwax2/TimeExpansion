@@ -6,6 +6,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,6 +30,7 @@ public class Verilog {
 	private ArrayList<String> ppo_connect = new ArrayList<String>();
 	private int number_of_additional_inv = 0;
 	private PrimaryPinName pp_names = new PrimaryPinName();
+	private HashMap<String, ArrayList<String>> time_frame = new HashMap<String, ArrayList<String>>();
 
 	private Pattern modname_regex = Pattern.compile("\\s*module\\s+(\\S+)\\s*\\((.+)\\)\\s*;.*");
 
@@ -286,13 +288,156 @@ public class Verilog {
 		return( sb.toString() );
 	}
 
+	/**
+	 * 所望の場所に観測点(tp_ゲート名_ポート名)を追加して新しく回路を作り直します
+	 * @param new_module_name 新しい回路のモジュール名
+	 * @param signal 観測点を追加する信号線名 ゲート名/ポート名 で指定してください（空白は除去しておいてね）
+	 * @return 新しく作り直した回路
+	 */
+	public ArrayList<String> addObservationPoint( String new_module_name, String signal ) {
+		return this.addObservationPoint(new_module_name, signal, -1);
+	}
+
+	/**
+	 * 片山さんの手法で等価検証ツールでt=1回路の対象信号線に値を固定させたいとき、
+	 * sa(縮退)_ゲート名_ポート名 という新たなポートを追加して、それに固定値をassignします。
+	 * 対象信号線に観測点は追加されていると思うけど、もう一方の回路の観測点の値を固定させます
+	 * @param new_module_name 新しい回路のモジュール名
+	 * @param signal 値を固定する信号線名 ゲート名/ポート名 で指定してください（空白は除去しておいてね）
+	 * @param value 固定させる値、0,1なら等価検証を使ってやります -1 なら観測点のみ追加します
+	 * @return 新しく作り直した回路
+	 */
+	public ArrayList<String> addObservationPoint( String new_module_name, String signal, int value ) {
+		boolean use_ec = ( value==0 || value==1 );
+		ArrayList<String> new_model = _setNewModule(new_module_name);
+		String gate = signal.split("/")[0]; // or wire
+		String port = (signal.split("/").length>1)?signal.split("/")[1]:null;
+		String tp_name = (port==null)? "tp_"+gate : "tp_"+gate+"_"+port;
+		String sa_name = (port==null)? "sa_"+gate : "sa_"+gate+"_"+port;
+
+		Pattern signal_gate_regex = Pattern.compile("\\s*(\\w+)\\s+"+gate+"\\s*\\((.+)\\)\\s*;.*");
+		Pattern signal_wire_regex = Pattern.compile("\\s*wire.*"+gate+".*");
+		for( int i=0; i<new_model.size(); i++ ) {
+			String s = new_model.get(i);
+			Matcher modname_macher = modname_regex.matcher(s);
+			Matcher signal_gate_macher = signal_gate_regex.matcher(s);
+			Matcher signal_wire_macher = signal_wire_regex.matcher(s);
+			if( modname_macher.matches() ) {
+				if( use_ec ) {
+					s = "module "+new_module_name+" ("+modname_macher.group(2)+", "+tp_name+", "+sa_name+" );";
+				} else {
+					s = "module "+new_module_name+" ("+modname_macher.group(2)+", "+tp_name+" );";
+				}
+			} else if( signal_gate_macher.matches() ) {
+				Matcher port_macher = Pattern.compile(".*\\."+port+"\\((.+?)\\).*").matcher(signal_gate_macher.group(2));
+				if( port_macher.matches() ) {
+					s += "\n";
+					s += "assign " + tp_name + " = " + port_macher.group(1) + ";";
+					if( use_ec ) {
+						s += "\n";
+						s += "assign " + sa_name + " = 1'b" + value + ";";
+					}
+				} else {
+					System.out.println("Warning: ゲートとポートの対応がとれませんでした");
+					System.out.println("ゲート："+gate);
+					System.out.println("ポート："+port);
+					System.out.println(s);
+				}
+			} else if( signal_wire_macher.matches() ) {
+				System.out.println("Warning: wire表現の故障リストにはまだ未対応ですぅ");
+				System.out.println(s);
+			} else {
+				continue;
+			}
+			new_model.set(i, s);
+		}
+		time_frame.put(new_module_name, new_model);
+		return new_model;
+	}
+
+	/**
+	 * とりあえず決め打ちで、入力なら直接1'bvを入れる、出力（Z, Y）ならassignする
+	 * @param new_module_name 新しい回路のモジュール名
+	 * @param signal 値を固定する信号線名 ゲート名/ポート名 で指定してください（空白は除去しておいてね）
+	 * @param value 仮定する縮退故障値
+	 * @return 新しく作り直した回路
+	 */
+	public ArrayList<String> insertStuck( String new_module_name, String signal, int value  ) {
+		ArrayList<String> new_model = _setNewModule(new_module_name);
+		String gate = signal.split("/")[0]; // or wire
+		String port = (signal.split("/").length>1)?signal.split("/")[1]:null;
+
+		Pattern signal_gate_regex = Pattern.compile("\\s*(\\w+)\\s+"+gate+"\\s*\\((.+)\\)\\s*;.*");
+		Pattern signal_wire_regex = Pattern.compile("\\s*wire.*"+gate+".*");
+		for( int i=0; i<new_model.size(); i++ ) {
+			String s = new_model.get(i);
+			Matcher modname_macher = modname_regex.matcher(s);
+			Matcher signal_gate_macher = signal_gate_regex.matcher(s);
+			Matcher signal_wire_macher = signal_wire_regex.matcher(s);
+			if( modname_macher.matches() ) {
+			} else if( signal_gate_macher.matches() ) {
+				Matcher port_macher = Pattern.compile(".*\\."+port+"\\((.+?)\\).*").matcher(signal_gate_macher.group(2));
+				if( port_macher.matches() ) {
+					// 決め打ち！カッコワルイ・・・
+					if( port.contains("Z") || port.contains("Y") ) {
+						s = s.replaceFirst("\\."+port+"\\(\\s*"+port_macher.group(1)+"\\s*\\)",
+								"."+port+"( "+port_macher.group(1).replaceAll("\\s+", "")+"_stuck )");
+						s += "\n";
+						s += "assign " + port_macher.group(1) + " = 1'b" + value + ";";
+					} else {
+						s = s.replaceFirst("\\."+port+"\\(\\s*"+port_macher.group(1)+"\\s*\\)",
+								"."+port+"( 1'b"+value+" )");
+					}
+				} else {
+					System.out.println("Warning: ゲートとポートの対応がとれませんでした");
+					System.out.println("ゲート："+gate);
+					System.out.println("ポート："+port);
+					System.out.println(s);
+				}
+			} else if( signal_wire_macher.matches() ) {
+				System.out.println("Warning: wire表現の故障リストにはまだ未対応ですぅ");
+				System.out.println(s);
+			} else {
+				continue;
+			}
+			new_model.set(i, s);
+		}
+		time_frame.put(new_module_name, new_model);
+		return new_model;
+	}
+
+	private ArrayList<String> _setNewModule( String new_module_name ) {
+		ArrayList<String> new_model = null;
+		if( time_frame.containsKey(new_module_name) ) {
+			new_model = time_frame.get(new_module_name);
+		} else {
+			new_model = new ArrayList<String>();
+			for( String s: result ) {
+				Matcher modname_macher = modname_regex.matcher(s);
+				if( modname_macher.matches() ) {
+					new_model.add("module "+new_module_name+" ("+modname_macher.group(2)+");");
+				} else {
+					new_model.add(s);
+				}
+			}
+		}
+		return( new_model );
+	}
+
+	/**
+	 * Verilogネットリストをモジュール名を変更して取得します
+	 * @param new_module_name 新しいモジュール名
+	 * @return 新しいモジュール名となったネットリスト
+	 */
 	public ArrayList<String> getVerilogNetListWith( String new_module_name ) {
+		if( time_frame.containsKey(new_module_name) ) {
+			return(time_frame.get(new_module_name));
+		}
 		ArrayList<String> new_model = new ArrayList<String>();
 		for( String s: result ) {
-			if( s.matches("(\\s*module\\s+)\\S+(.*)") ) {
-				Matcher m = Pattern.compile("(\\s*module\\s+)\\S+(.*)").matcher(s);
-				if( m.matches() )
-					new_model.add(m.group(1)+new_module_name+m.group(2));
+			Matcher modname_macher = modname_regex.matcher(s);
+			if( modname_macher.matches() ) {
+				new_model.add("module "+new_module_name+" ("+modname_macher.group(2)+");");
 			} else {
 				new_model.add(s);
 			}

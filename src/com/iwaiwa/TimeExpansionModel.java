@@ -3,17 +3,18 @@ package com.iwaiwa;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class TimeExpansionModel {
 	private Verilog v = null;
-	private ArrayList<String> expanded = new ArrayList<String>();
+	private ArrayList<String> expanded = null;
 	private ArrayList<String> input_definition = new ArrayList<String>();
 	private ArrayList<String> output_definition = new ArrayList<String>();
 	private ArrayList<String> wire_definition = new ArrayList<String>();
 	private ArrayList<String> ccs_definition = new ArrayList<String>();
 	private String t1_module_name = null;
 	private String t2_module_name = null;
-
 
 	public TimeExpansionModel( Verilog v ) {
 		this.v = v;
@@ -45,7 +46,6 @@ public class TimeExpansionModel {
 		}
 
 		ccs_definition.add(t1_module_name+" t1 (");
-//		ccs_definition.add(v.getModuleName()+" t1 (");
 		for( String in: v.getPp_names().getPis() ) {
 			ccs_definition.add("\t." + in.replaceFirst("\\[\\d+:\\d+\\]", "")+"(" + in.replaceFirst("\\[\\d+:\\d+\\]", "")+"_t1), ");
 		}
@@ -62,7 +62,6 @@ public class TimeExpansionModel {
 		ccs_definition.add(last_line.substring(0, last_line.length()-2)+" );");
 
 		ccs_definition.add(t2_module_name+" t2 (");
-//		ccs_definition.add(v.getModuleName()+" t2 (");
 		for( String in: v.getPp_names().getPis() ) {
 			ccs_definition.add("\t." + in.replaceFirst("\\[\\d+:\\d+\\]", "")+"(" + in.replaceFirst("\\[\\d+:\\d+\\]", "")+"_t2), ");
 		}
@@ -77,8 +76,31 @@ public class TimeExpansionModel {
 		}
 		last_line = ccs_definition.remove(ccs_definition.size()-1);
 		ccs_definition.add(last_line.substring(0, last_line.length()-2)+" );");
+	}
 
+	/**
+	 * 片山さんの遷移故障の冗長判定手法を使うための時間展開
+	 * equivalent-check 故障リスト中の単一遷移故障 オプションで指定可能。何も指定しなければ単純に時間展開するだけ
+	 * t=1に0/1を設定するように設計変更、t=2にsa0/1を設定して 出力ファイル名_故障_信号線名.flt に出力
+	 * 合わせて出力ファイル名は オリジナルの出力ファイル名_故障_信号線名.v に変更
+	 * @param wire 冗長判定したい対象の故障リスト中の単一遷移故障（stf   NO   U567/Z）など
+	 */
+	public void addEquivalentCheckModel( String transition_fault ) {
+		Matcher tf_match = Pattern.compile("\\s*(st[rf])\\s+(\\S+)\\s+(\\S+).*").matcher(transition_fault);
+		if( tf_match.matches() ) {
+			String fault = tf_match.group(1);
+			String wire  = tf_match.group(3);
+			int sa_value = (fault.equals("str"))?0:1; // strなら固定値、縮退故障ともに0, stfなら1
+			v.addObservationPoint(t1_module_name, wire, sa_value );
+			v.insertStuck(t2_module_name, wire, sa_value );
+		} else {
+			System.out.println("Error: Cannot analyze the following fault desicription.");
+			System.out.println(transition_fault);
+		}
 
+	}
+	public void completeVerilog() {
+		expanded = new ArrayList<String>();
 		StringBuffer module_definition = new StringBuffer("module ");
 		module_definition.append(v.getModuleName());
 		module_definition.append("_bs ( ");
@@ -92,7 +114,7 @@ public class TimeExpansionModel {
 		}
 		module_definition.delete(module_definition.length()-2, module_definition.length());
 		module_definition.append(" );");
-		expanded.add(Verilog.clearLine80(module_definition.toString()));
+		expanded.add(module_definition.toString());
 		for( String s: input_definition ) {
 			expanded.add(s);
 		}
@@ -132,7 +154,7 @@ public class TimeExpansionModel {
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(file));
 			for( String s : expanded ) {
-				bw.write(s);
+				bw.write(Verilog.clearLine80(s));
 				bw.newLine();
 			}
 			bw.close();

@@ -42,8 +42,14 @@ public class TimeExpansion {
 		TimeExpansionModel tem = new TimeExpansionModel(v);
 		if( conf.getExpand_method().equals("BroadSide")  ) { // broadside
 			tem.expandWithBroadSide();
-		} else { // skewedloadはそのうち書く
+		} else {
+			// skewedloadはそのうち書く
 		}
+		if( conf.getEquivalent_check() != null ) {
+			// 片山さんの遷移故障の冗長判定手法で使う equivalent-check <遷移故障名>
+			tem.addEquivalentCheckModel(conf.getEquivalent_check());
+		}
+		tem.completeVerilog();
 //		tem.printVerilog();
 		tem.writeVerilog( conf.getOutput_file() );
 	}

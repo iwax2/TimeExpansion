@@ -356,6 +356,7 @@ public class Verilog {
 	}
 
 	/**
+	 * 遷移故障を縮退故障として扱うために、t=2に縮退故障を仮定します
 	 * とりあえず決め打ちで、入力なら直接1'bvを入れる、出力（Z, Y）ならassignする
 	 * @param new_module_name 新しい回路のモジュール名
 	 * @param signal 値を固定する信号線名 ゲート名/ポート名 で指定してください（空白は除去しておいてね）
@@ -371,11 +372,9 @@ public class Verilog {
 		Pattern signal_wire_regex = Pattern.compile("\\s*wire.*"+gate+".*");
 		for( int i=0; i<new_model.size(); i++ ) {
 			String s = new_model.get(i);
-			Matcher modname_macher = modname_regex.matcher(s);
 			Matcher signal_gate_macher = signal_gate_regex.matcher(s);
 			Matcher signal_wire_macher = signal_wire_regex.matcher(s);
-			if( modname_macher.matches() ) {
-			} else if( signal_gate_macher.matches() ) {
+			if( signal_gate_macher.matches() ) {
 				Matcher port_macher = Pattern.compile(".*\\."+port+"\\((.+?)\\).*").matcher(signal_gate_macher.group(2));
 				if( port_macher.matches() ) {
 					// 決め打ち！カッコワルイ・・・
@@ -406,9 +405,65 @@ public class Verilog {
 		return new_model;
 	}
 
+	/**
+	 * 観測点を外部出力につなげます
+	 * @param new_module_name 外部出力を持つモジュール名
+	 * @param signal 観測点をつないだ信号線名
+	 * @param isReference リファレンスか実装（インプリ）かいずれか
+	 * @return 観測点をつなげた回路
+	 */
+	public ArrayList<String> bridgeTestPoint( String new_module_name, String signal, boolean isReference  ) {
+		ArrayList<String> new_model = _setNewModule(new_module_name);
+		String gate = signal.split("/")[0]; // or wire
+		String port = (signal.split("/").length>1)?signal.split("/")[1]:null;
+		String tp_name = (port==null)? "tp_"+gate : "tp_"+gate+"_"+port;
+		String sa_name = (port==null)? "sa_"+gate : "sa_"+gate+"_"+port;
+		String tpo_ref = "tp_ref";
+		String tpo_imp = "tp_imp";
+
+		boolean tp_is_not_used  = true;
+		Pattern endmodule_regex = Pattern.compile("\\s*endmodule\\s*;.*");
+		for( int i=0; i<new_model.size(); i++ ) {
+			String s = new_model.get(i);
+			Matcher modname_macher = modname_regex.matcher(s);
+			Matcher endmodule_macher = endmodule_regex.matcher(s);
+			if( modname_macher.matches() ) {
+				s = "module "+new_module_name+" ("+modname_macher.group(2)+", "+tpo_ref+", "+tpo_imp+" );";
+			} else if( s.contains(tp_name) && tp_is_not_used ) {
+				String tmp = s;
+				s = "wire " + tp_name + ", " + sa_name + ";\n";
+				s += tmp;
+				tp_is_not_used = false;
+			} else if( endmodule_macher.matches() ) {
+				String tmp = s;
+				if( isReference ) {
+					s  = "assign " + tpo_ref + " = " + tp_name + ";\n";
+					s += "assign " + tpo_imp + " = " + sa_name + ";\n";
+				} else {
+					s  = "assign " + tpo_ref + " = " + sa_name + ";\n";
+					s += "assign " + tpo_imp + " = " + tp_name + ";\n";
+				}
+				s += tmp;
+			} else {
+				continue;
+			}
+			new_model.set(i, s);
+		}
+		time_frame.put(new_module_name, new_model);
+		return new_model;
+	}
+
+	/**
+	 * 新しいモジュール名で回路をコピーします
+	 * もしその名前があればその回路そのものを返します
+	 * @param new_module_name 新しく作りたい回路のモジュール名
+	 * @return 回路のコピー（文字列）
+	 */
 	private ArrayList<String> _setNewModule( String new_module_name ) {
 		ArrayList<String> new_model = null;
-		if( time_frame.containsKey(new_module_name) ) {
+		if( this.getModuleName().equals(new_module_name) ) {
+			new_model = result;
+		} else if( time_frame.containsKey(new_module_name) ) {
 			new_model = time_frame.get(new_module_name);
 		} else {
 			new_model = new ArrayList<String>();
@@ -477,7 +532,7 @@ public class Verilog {
 			StringBuffer st = new StringBuffer();
 			int p = long_term.lastIndexOf(",",80)+2;
 			int li = 0;
-			while( p > li ) {
+			while( (long_term.length()-p) > 80 ) {
 				st.append(long_term.substring(li,p));
 				st.append("\n");
 				li=p;

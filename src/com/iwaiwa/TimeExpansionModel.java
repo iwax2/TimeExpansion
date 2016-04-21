@@ -93,6 +93,7 @@ public class TimeExpansionModel {
 			int sa_value = (fault.equals("str"))?0:1; // strなら固定値、縮退故障ともに0, stfなら1
 			v.addObservationPoint(t1_module_name, wire, sa_value );
 			v.insertStuck(t2_module_name, wire, sa_value );
+			v.bridgeTestPoint(v.getModuleName(), wire, false);
 		} else {
 			System.out.println("Error: Cannot analyze the following fault desicription.");
 			System.out.println(transition_fault);

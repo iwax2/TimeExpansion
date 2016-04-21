@@ -35,8 +35,7 @@ ppo_RMAX_reg_1__t2, ppo_RMAX_reg_0__t2, ppo_RMIN_reg_7__t2, ppo_RMIN_reg_6__t2,
 ppo_RMIN_reg_5__t2, ppo_RMIN_reg_4__t2, ppo_RMIN_reg_3__t2, ppo_RMIN_reg_2__t2, 
 ppo_RMIN_reg_1__t2, ppo_RMIN_reg_0__t2, ppo_DATA_OUT_reg_0__t2, 
 ppo_DATA_OUT_reg_1__t2, ppo_DATA_OUT_reg_7__t2, ppo_DATA_OUT_reg_6__t2, 
-ppo_DATA_OUT_reg_2__t2, ppo_DATA_OUT_reg_3__t2, ppo_DATA_OUT_reg_5__t2, 
-ppo_DATA_OUT_reg_4__t2 );
+ppo_DATA_OUT_reg_2__t2, ppo_DATA_OUT_reg_3__t2, ppo_DATA_OUT_reg_5__t2, ppo_DATA_OUT_reg_4__t2 );
 	 input [7:0] DATA_IN_t1;
 	 input RESTART_t1;
 	 input AVERAGE_t1;
@@ -571,8 +570,7 @@ module b04_t1 (  ppi_DATA_OUT_reg_0_ ,  ppi_DATA_OUT_reg_1_ ,
  ppo_RMAX_reg_7_ ,  ppo_RMIN_reg_0_ ,  ppo_RMIN_reg_1_ ,  ppo_RMIN_reg_2_ , 
  ppo_RMIN_reg_3_ ,  ppo_RMIN_reg_4_ ,  ppo_RMIN_reg_5_ ,  ppo_RMIN_reg_6_ , 
  ppo_RMIN_reg_7_ ,  ppo_stato_reg_0_ ,  ppo_stato_reg_1_ , AVERAGE , DATA_IN , 
-DATA_OUT , ENABLE , RESTART , test_se , test_si , test_so , tp_U567_A, 
-sa_U567_A );
+DATA_OUT , ENABLE , RESTART , test_se , test_si , test_so , tp_U567_A, sa_U567_A );
 // begining of the input definition.
 	  input [7:0] DATA_IN;
 	  input RESTART, AVERAGE, ENABLE, test_si, test_se;
@@ -747,9 +745,7 @@ n487, n488, n489, n490, n491, n492, n493, n494, n495, n496, n497, n498, n499,
 n500, n501, n502, n503, n504, n505, n506, n507, n508, n509, n510, n511, n512, 
 n513, n514, n515, n516, n517, n518, n519, n520, n521, n523, n524, n525, n526, 
 n527, n528, n529, n530, n531, n532, n533, n534, n535, n536, n537, n538, n539, 
-n540, n541, n542, n543, n544, n545, n546, n547, n548, n549, n550, n551, n552, 
-n553, n554, n555, n556, n557, n558, n559, n560, n561, n562, n563, n564, 
-n565;
+n540, n541, n542, n543, n544, n545, n546, n547, n548, n549, n550, n551, n552, n553, n554, n555, n556, n557, n558, n559, n560, n561, n562, n563, n564, n565;
 	wire [1:0] stato;
 	wire [7:0] RMAX;
 	wire [7:0] RMIN;
@@ -836,8 +832,7 @@ n565;
 	AO7 U313 ( .A(n352), .B(n350), .C(n459), .Z(n461) );
 	AO7 U314 ( .A(DATA_IN[5]), .B(n458), .C(REG4[5]), .Z(n459) );
 	EON1 U315 ( .A(n463), .B(n344), .C(n462), .D(REG4[7]), .Z(n465) );
-	AO3 U316 ( .A(DATA_IN[1]), .B(REG4[1]), .C(DATA_IN[0]), .D(REG4[0]), 
-.Z(n451) );
+	AO3 U316 ( .A(DATA_IN[1]), .B(REG4[1]), .C(DATA_IN[0]), .D(REG4[0]), .Z(n451) );
 	AO7 U317 ( .A(n453), .B(n359), .C(n452), .Z(n455) );
 	AO7 U318 ( .A(DATA_IN[2]), .B(n362), .C(REG4[2]), .Z(n452) );
 	AO6 U319 ( .A(DATA_IN[1]), .B(REG4[1]), .C(n363), .Z(n453) );
@@ -1006,9 +1001,7 @@ n565;
 	EOI U482 ( .A(n497), .B(dp_cluster_0_N104), .Z(N121) );
 	NR2I U483 ( .A(n497), .B(dp_cluster_0_N104), .Z(n498) );
 	ENI U484 ( .A(n498), .B(dp_cluster_0_N105), .Z(N122) );
-	NR4P U485 ( .A(N108), .B(dp_cluster_0_N105), .C(dp_cluster_0_N104), 
-.D( dp_cluster_0_N103), 
-.Z(n499) );
+	NR4P U485 ( .A(N108), .B(dp_cluster_0_N105), .C(dp_cluster_0_N104), .D( dp_cluster_0_N103), .Z(n499) );
 	ND4P U486 ( .A(n357), .B(n354), .C(n360), .D(n499), .Z(n500) );
 	ND2I U487 ( .A(n500), .B(n346), .Z(n501) );
 	AO7P U488 ( .A(n500), .B(n346), .C(n501), .Z(N123) );
@@ -1030,9 +1023,7 @@ n565;
 	EOI U504 ( .A(n511), .B(dp_cluster_1_N47), .Z(N64) );
 	NR2I U505 ( .A(n511), .B(dp_cluster_1_N47), .Z(n512) );
 	ENI U506 ( .A(n512), .B(dp_cluster_1_N48), .Z(N65) );
-	NR4P U507 ( .A(N51), .B(dp_cluster_1_N48), .C(dp_cluster_1_N47), 
-.D( dp_cluster_1_N46), 
-.Z(n513) );
+	NR4P U507 ( .A(N51), .B(dp_cluster_1_N48), .C(dp_cluster_1_N47), .D( dp_cluster_1_N46), .Z(n513) );
 	ND4P U508 ( .A(n380), .B(n379), .C(n381), .D(n513), .Z(n514) );
 	ND2I U509 ( .A(n514), .B(n377), .Z(n515) );
 	AO7P U510 ( .A(n514), .B(n377), .C(n515), .Z(N66) );
@@ -1092,8 +1083,7 @@ n565;
 	IVI U564 ( .A(n412), .Z(n383) );
 	IVI U565 ( .A(n409), .Z(n384) );
 	IVI U566 ( .A(n406), .Z(n385) );
-	IVI U567 ( .A(N39), 
-.Z(n386) );
+	IVI U567 ( .A(N39), .Z(n386) );
 assign tp_U567_A = N39;
 assign sa_U567_A = 1'b1;
 	IVI U568 ( .A(n428), .Z(n387) );
@@ -1366,9 +1356,7 @@ module b04_t2 (  ppi_DATA_OUT_reg_0_ ,  ppi_DATA_OUT_reg_1_ ,
  ppo_RMAX_reg_3_ ,  ppo_RMAX_reg_4_ ,  ppo_RMAX_reg_5_ ,  ppo_RMAX_reg_6_ , 
  ppo_RMAX_reg_7_ ,  ppo_RMIN_reg_0_ ,  ppo_RMIN_reg_1_ ,  ppo_RMIN_reg_2_ , 
  ppo_RMIN_reg_3_ ,  ppo_RMIN_reg_4_ ,  ppo_RMIN_reg_5_ ,  ppo_RMIN_reg_6_ , 
- ppo_RMIN_reg_7_ ,  ppo_stato_reg_0_ ,  ppo_stato_reg_1_ , AVERAGE , DATA_IN , 
-DATA_OUT , ENABLE , RESTART , test_se , test_si , 
-test_so );
+ ppo_RMIN_reg_7_ ,  ppo_stato_reg_0_ ,  ppo_stato_reg_1_ , AVERAGE , DATA_IN , DATA_OUT , ENABLE , RESTART , test_se , test_si , test_so );
 // begining of the input definition.
 	  input [7:0] DATA_IN;
 	  input RESTART, AVERAGE, ENABLE, test_si, test_se;
@@ -1543,9 +1531,7 @@ n487, n488, n489, n490, n491, n492, n493, n494, n495, n496, n497, n498, n499,
 n500, n501, n502, n503, n504, n505, n506, n507, n508, n509, n510, n511, n512, 
 n513, n514, n515, n516, n517, n518, n519, n520, n521, n523, n524, n525, n526, 
 n527, n528, n529, n530, n531, n532, n533, n534, n535, n536, n537, n538, n539, 
-n540, n541, n542, n543, n544, n545, n546, n547, n548, n549, n550, n551, n552, 
-n553, n554, n555, n556, n557, n558, n559, n560, n561, n562, n563, n564, 
-n565;
+n540, n541, n542, n543, n544, n545, n546, n547, n548, n549, n550, n551, n552, n553, n554, n555, n556, n557, n558, n559, n560, n561, n562, n563, n564, n565;
 	wire [1:0] stato;
 	wire [7:0] RMAX;
 	wire [7:0] RMIN;
@@ -1632,8 +1618,7 @@ n565;
 	AO7 U313 ( .A(n352), .B(n350), .C(n459), .Z(n461) );
 	AO7 U314 ( .A(DATA_IN[5]), .B(n458), .C(REG4[5]), .Z(n459) );
 	EON1 U315 ( .A(n463), .B(n344), .C(n462), .D(REG4[7]), .Z(n465) );
-	AO3 U316 ( .A(DATA_IN[1]), .B(REG4[1]), .C(DATA_IN[0]), .D(REG4[0]), 
-.Z(n451) );
+	AO3 U316 ( .A(DATA_IN[1]), .B(REG4[1]), .C(DATA_IN[0]), .D(REG4[0]), .Z(n451) );
 	AO7 U317 ( .A(n453), .B(n359), .C(n452), .Z(n455) );
 	AO7 U318 ( .A(DATA_IN[2]), .B(n362), .C(REG4[2]), .Z(n452) );
 	AO6 U319 ( .A(DATA_IN[1]), .B(REG4[1]), .C(n363), .Z(n453) );
@@ -1802,9 +1787,7 @@ n565;
 	EOI U482 ( .A(n497), .B(dp_cluster_0_N104), .Z(N121) );
 	NR2I U483 ( .A(n497), .B(dp_cluster_0_N104), .Z(n498) );
 	ENI U484 ( .A(n498), .B(dp_cluster_0_N105), .Z(N122) );
-	NR4P U485 ( .A(N108), .B(dp_cluster_0_N105), .C(dp_cluster_0_N104), 
-.D( dp_cluster_0_N103), 
-.Z(n499) );
+	NR4P U485 ( .A(N108), .B(dp_cluster_0_N105), .C(dp_cluster_0_N104), .D( dp_cluster_0_N103), .Z(n499) );
 	ND4P U486 ( .A(n357), .B(n354), .C(n360), .D(n499), .Z(n500) );
 	ND2I U487 ( .A(n500), .B(n346), .Z(n501) );
 	AO7P U488 ( .A(n500), .B(n346), .C(n501), .Z(N123) );
@@ -1826,9 +1809,7 @@ n565;
 	EOI U504 ( .A(n511), .B(dp_cluster_1_N47), .Z(N64) );
 	NR2I U505 ( .A(n511), .B(dp_cluster_1_N47), .Z(n512) );
 	ENI U506 ( .A(n512), .B(dp_cluster_1_N48), .Z(N65) );
-	NR4P U507 ( .A(N51), .B(dp_cluster_1_N48), .C(dp_cluster_1_N47), 
-.D( dp_cluster_1_N46), 
-.Z(n513) );
+	NR4P U507 ( .A(N51), .B(dp_cluster_1_N48), .C(dp_cluster_1_N47), .D( dp_cluster_1_N46), .Z(n513) );
 	ND4P U508 ( .A(n380), .B(n379), .C(n381), .D(n513), .Z(n514) );
 	ND2I U509 ( .A(n514), .B(n377), .Z(n515) );
 	AO7P U510 ( .A(n514), .B(n377), .C(n515), .Z(N66) );

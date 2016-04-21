@@ -310,10 +310,10 @@ public class Verilog {
 	public ArrayList<String> addObservationPoint( String new_module_name, String signal, int value ) {
 		boolean use_ec = ( value==0 || value==1 );
 		ArrayList<String> new_model = _setNewModule(new_module_name);
-		String gate = signal.split("/")[0]; // or wire
-		String port = (signal.split("/").length>1)?signal.split("/")[1]:null;
-		String tp_name = (port==null)? "tp_"+gate : "tp_"+gate+"_"+port;
-		String sa_name = (port==null)? "sa_"+gate : "sa_"+gate+"_"+port;
+		String gate = _getGatePort(signal)[0];
+		String port = _getGatePort(signal)[1];
+		String tp_name = getTestPointName(signal);
+		String sa_name = getStuckAtName(signal);
 
 		Pattern signal_gate_regex = Pattern.compile("\\s*(\\w+)\\s+"+gate+"\\s*\\((.+)\\)\\s*;.*");
 		Pattern signal_wire_regex = Pattern.compile("\\s*wire.*"+gate+".*");
@@ -365,8 +365,8 @@ public class Verilog {
 	 */
 	public ArrayList<String> insertStuck( String new_module_name, String signal, int value  ) {
 		ArrayList<String> new_model = _setNewModule(new_module_name);
-		String gate = signal.split("/")[0]; // or wire
-		String port = (signal.split("/").length>1)?signal.split("/")[1]:null;
+		String gate = _getGatePort(signal)[0];
+		String port = _getGatePort(signal)[1];
 
 		Pattern signal_gate_regex = Pattern.compile("\\s*(\\w+)\\s+"+gate+"\\s*\\((.+)\\)\\s*;.*");
 		Pattern signal_wire_regex = Pattern.compile("\\s*wire.*"+gate+".*");
@@ -406,54 +406,6 @@ public class Verilog {
 	}
 
 	/**
-	 * 観測点を外部出力につなげます
-	 * @param new_module_name 外部出力を持つモジュール名
-	 * @param signal 観測点をつないだ信号線名
-	 * @param isReference リファレンスか実装（インプリ）かいずれか
-	 * @return 観測点をつなげた回路
-	 */
-	public ArrayList<String> bridgeTestPoint( String new_module_name, String signal, boolean isReference  ) {
-		ArrayList<String> new_model = _setNewModule(new_module_name);
-		String gate = signal.split("/")[0]; // or wire
-		String port = (signal.split("/").length>1)?signal.split("/")[1]:null;
-		String tp_name = (port==null)? "tp_"+gate : "tp_"+gate+"_"+port;
-		String sa_name = (port==null)? "sa_"+gate : "sa_"+gate+"_"+port;
-		String tpo_ref = "tp_ref";
-		String tpo_imp = "tp_imp";
-
-		boolean tp_is_not_used  = true;
-		Pattern endmodule_regex = Pattern.compile("\\s*endmodule\\s*;.*");
-		for( int i=0; i<new_model.size(); i++ ) {
-			String s = new_model.get(i);
-			Matcher modname_macher = modname_regex.matcher(s);
-			Matcher endmodule_macher = endmodule_regex.matcher(s);
-			if( modname_macher.matches() ) {
-				s = "module "+new_module_name+" ("+modname_macher.group(2)+", "+tpo_ref+", "+tpo_imp+" );";
-			} else if( s.contains(tp_name) && tp_is_not_used ) {
-				String tmp = s;
-				s = "wire " + tp_name + ", " + sa_name + ";\n";
-				s += tmp;
-				tp_is_not_used = false;
-			} else if( endmodule_macher.matches() ) {
-				String tmp = s;
-				if( isReference ) {
-					s  = "assign " + tpo_ref + " = " + tp_name + ";\n";
-					s += "assign " + tpo_imp + " = " + sa_name + ";\n";
-				} else {
-					s  = "assign " + tpo_ref + " = " + sa_name + ";\n";
-					s += "assign " + tpo_imp + " = " + tp_name + ";\n";
-				}
-				s += tmp;
-			} else {
-				continue;
-			}
-			new_model.set(i, s);
-		}
-		time_frame.put(new_module_name, new_model);
-		return new_model;
-	}
-
-	/**
 	 * 新しいモジュール名で回路をコピーします
 	 * もしその名前があればその回路そのものを返します
 	 * @param new_module_name 新しく作りたい回路のモジュール名
@@ -477,6 +429,33 @@ public class Verilog {
 			}
 		}
 		return( new_model );
+	}
+
+	/**
+	 * 信号線表記 (U84/Zなど) からゲートとポートを整形して取得します
+	 * @param signal 信号線表記
+	 * @return [0] ゲートのインスタンス名<br>
+	 *[1] ゲートのポート名
+	 */
+	private String[] _getGatePort( String signal ) {
+		String [] gp = new String[2];
+		gp[0] = signal.split("/")[0];
+		gp[1] = (signal.split("/").length>1)?signal.split("/")[1]:null;
+		return gp;
+
+	}
+
+	public String getTestPointName( String signal ) {
+		String gate = _getGatePort(signal)[0];
+		String port = _getGatePort(signal)[1];
+		String tp_name = (port==null)? "tp_"+gate : "tp_"+gate+"_"+port;
+		return tp_name;
+	}
+	public String getStuckAtName( String signal ) {
+		String gate = _getGatePort(signal)[0];
+		String port = _getGatePort(signal)[1];
+		String sa_name = (port==null)? "sa_"+gate : "sa_"+gate+"_"+port;
+		return sa_name;
 	}
 
 	/**

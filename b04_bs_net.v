@@ -35,7 +35,7 @@ ppo_RMAX_reg_1__t2, ppo_RMAX_reg_0__t2, ppo_RMIN_reg_7__t2, ppo_RMIN_reg_6__t2,
 ppo_RMIN_reg_5__t2, ppo_RMIN_reg_4__t2, ppo_RMIN_reg_3__t2, ppo_RMIN_reg_2__t2, 
 ppo_RMIN_reg_1__t2, ppo_RMIN_reg_0__t2, ppo_DATA_OUT_reg_0__t2, 
 ppo_DATA_OUT_reg_1__t2, ppo_DATA_OUT_reg_7__t2, ppo_DATA_OUT_reg_6__t2, 
-ppo_DATA_OUT_reg_2__t2, ppo_DATA_OUT_reg_3__t2, ppo_DATA_OUT_reg_5__t2, ppo_DATA_OUT_reg_4__t2 );
+ppo_DATA_OUT_reg_2__t2, ppo_DATA_OUT_reg_3__t2, ppo_DATA_OUT_reg_5__t2, ppo_DATA_OUT_reg_4__t2, tp_ref,tp_imp );
 	 input [7:0] DATA_IN_t1;
 	 input RESTART_t1;
 	 input AVERAGE_t1;
@@ -184,6 +184,7 @@ ppo_DATA_OUT_reg_2__t2, ppo_DATA_OUT_reg_3__t2, ppo_DATA_OUT_reg_5__t2, ppo_DATA
 	output ppo_DATA_OUT_reg_3__t2;
 	output ppo_DATA_OUT_reg_5__t2;
 	output ppo_DATA_OUT_reg_4__t2;
+	output tp_ref,  tp_imp;
 	wire RLAST_reg_7_;
 	wire RLAST_reg_6_;
 	wire RLAST_reg_5_;
@@ -251,6 +252,8 @@ ppo_DATA_OUT_reg_2__t2, ppo_DATA_OUT_reg_3__t2, ppo_DATA_OUT_reg_5__t2, ppo_DATA
 	wire DATA_OUT_reg_5_;
 	wire DATA_OUT_reg_4_;
 b04_t1 t1 (
+	.sa_U567_A(tp_imp), 
+	.tp_U567_A(tp_ref), 
 	.DATA_IN(DATA_IN_t1), 
 	.RESTART(RESTART_t1), 
 	.AVERAGE(AVERAGE_t1), 

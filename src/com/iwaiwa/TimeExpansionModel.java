@@ -93,7 +93,15 @@ public class TimeExpansionModel {
 			int sa_value = (fault.equals("str"))?0:1; // strなら固定値、縮退故障ともに0, stfなら1
 			v.addObservationPoint(t1_module_name, wire, sa_value );
 			v.insertStuck(t2_module_name, wire, sa_value );
-			v.bridgeTestPoint(v.getModuleName(), wire, false);
+			output_definition.add("\toutput " + "tp_ref,  tp_imp;");
+			for( int i=0; i<ccs_definition.size(); i++ ) {
+				String s = ccs_definition.get(i);
+				if( s.matches("\\s*"+t1_module_name+"\\s+\\S+\\s*\\(.*") ) {
+					s += "\n\t." + v.getStuckAtName(wire)+"(tp_imp), \n";
+					s += "\t." + v.getTestPointName(wire)+"(tp_ref), ";
+					ccs_definition.set(i, s);
+				}
+			}
 		} else {
 			System.out.println("Error: Cannot analyze the following fault desicription.");
 			System.out.println(transition_fault);

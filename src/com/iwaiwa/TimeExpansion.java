@@ -5,7 +5,7 @@ import java.io.File;
 
 public class TimeExpansion {
 	public static String usage = "usage: time_expansion [expansion.conf]";
-	public static String version = "time_expansion ver-0.1a @ Apr. 13, 2016"; // まだ何もできてない
+	public static String version = "time_expansion ver-1.0a @ Apr. 22, 2016"; // いちおうできた
 
 	/**
 	 * @param args 引数<br>
@@ -37,20 +37,24 @@ public class TimeExpansion {
 		ExpansionConf conf = new ExpansionConf(expansion_conf);
 		Verilog v = new Verilog( conf );
 		v.generateCombCicuit();
-//		v.writeVerilog( conf.getOutput_file() );
-//		v.printVerilog();
-		TimeExpansionModel tem = new TimeExpansionModel(v);
-		if( conf.getExpand_method().equals("BroadSide")  ) { // broadside
+		if( ("BroadSide").equals(conf.getExpand_method()) ) { // broadside
+			TimeExpansionModel tem = new TimeExpansionModel(v);
 			tem.expandWithBroadSide();
-		} else {
+			tem.writeVerilog( conf.getOutput_file() );
+//			tem.printVerilog();
+		} else if( ("SkewedLoad").equals(conf.getExpand_method()) ) {
 			// skewedloadはそのうち書く
-		}
-		if( conf.getEquivalent_check() != null ) {
+		} else if( conf.getEquivalent_check() != null ) {
 			// 片山さんの遷移故障の冗長判定手法で使う equivalent-check <遷移故障名>
-			tem.addEquivalentCheckModel(conf.getEquivalent_check());
+			FunctionalEquivalenceModel fem = new FunctionalEquivalenceModel(v);
+			fem.addEquivalentCheckModel(conf.getEquivalent_check());
+			fem.writeVerilog( conf.getOutput_file() );
+//			fem.printVerilog();
+		} else {
+			// 時間展開せずに出力
+			v.writeVerilog( conf.getOutput_file() );
+//			v.printVerilog();
 		}
-		tem.completeVerilog();
-//		tem.printVerilog();
-		tem.writeVerilog( conf.getOutput_file() );
+
 	}
 }

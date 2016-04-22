@@ -126,7 +126,7 @@ public class ExpansionConf {
 				System.exit(0);
 			}
 		}
-		if( expand_method == null ) {
+		if( expand_method == null && equivalent_check == null ) {
 			System.out.println("Error: expand-method option must be specified in the configuration file.");
 			System.exit(0);
 		} else if( input_file == null ) {

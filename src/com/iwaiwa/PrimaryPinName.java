@@ -40,6 +40,16 @@ public class PrimaryPinName {
 		}
 	}
 
+	public void addPI( String input_port ) {
+		for( String name: input_port.replaceFirst("\\s*input\\s+", "").replaceFirst("\\s*;\\s*", "").split(",") ) {
+			pis.add(name.replaceAll("\\s+", ""));
+		}
+	}
+	public void addPO( String output_port ) {
+		for( String name: output_port.replaceFirst("\\s*output\\s+", "").replaceFirst("\\s*;\\s*", "").split(",") ) {
+			pos.add(name.replaceAll("\\s+", ""));
+		}
+	}
 	public ArrayList<String> getPis() {
 		return pis;
 	}

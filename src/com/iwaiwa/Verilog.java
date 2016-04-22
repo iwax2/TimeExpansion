@@ -6,7 +6,6 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -30,9 +29,9 @@ public class Verilog {
 	private ArrayList<String> ppo_connect = new ArrayList<String>();
 	private int number_of_additional_inv = 0;
 	private PrimaryPinName pp_names = new PrimaryPinName();
-	private HashMap<String, ArrayList<String>> time_frame = new HashMap<String, ArrayList<String>>();
+//	private HashMap<String, ArrayList<String>> time_frame = new HashMap<String, ArrayList<String>>();
 
-	private Pattern modname_regex = Pattern.compile("\\s*module\\s+(\\S+)\\s*\\((.+)\\)\\s*;.*");
+	public static final Pattern modname_regex = Pattern.compile("\\s*module\\s+(\\S+)\\s*\\((.+)\\)\\s*;.*");
 
 	/**
 	 * Verilog Netlistクラス
@@ -49,6 +48,7 @@ public class Verilog {
 			br.close();
 		} catch( Exception e ) {
 			e.printStackTrace();
+			System.exit(0);
 		}
 		String top_module_name = expansion_conf.getTop_module();
 		if( top_module_name != null ) {
@@ -309,12 +309,13 @@ public class Verilog {
 	 */
 	public ArrayList<String> addObservationPoint( String new_module_name, String signal, int value ) {
 		boolean use_ec = ( value==0 || value==1 );
-		ArrayList<String> new_model = _setNewModule(new_module_name);
+		ArrayList<String> new_model = getModuleWithNewName(new_module_name);
 		String gate = _getGatePort(signal)[0];
 		String port = _getGatePort(signal)[1];
 		String tp_name = getTestPointName(signal);
 		String sa_name = getStuckAtName(signal);
 
+		boolean output_def_flag = true;
 		Pattern signal_gate_regex = Pattern.compile("\\s*(\\w+)\\s+"+gate+"\\s*\\((.+)\\)\\s*;.*");
 		Pattern signal_wire_regex = Pattern.compile("\\s*wire.*"+gate+".*");
 		for( int i=0; i<new_model.size(); i++ ) {
@@ -346,12 +347,24 @@ public class Verilog {
 			} else if( signal_wire_macher.matches() ) {
 				System.out.println("Warning: wire表現の故障リストにはまだ未対応ですぅ");
 				System.out.println(s);
+			} else if( s.matches("\\s*output\\s+.+\\s*;.*") && output_def_flag ) {
+				output_def_flag = false;
+				String temp = s;
+				s  = "\toutput "+tp_name+", "+sa_name+";";
+				if( use_ec ) {
+					s  = "\toutput "+tp_name+", "+sa_name+";";
+				} else {
+					s  = "\toutput "+tp_name+";";
+				}
+				// ダメだt2まで更新されてしまうｗ
+//				pp_names.addPO(s);
+				s += "\n" + temp;
 			} else {
 				continue;
 			}
 			new_model.set(i, s);
 		}
-		time_frame.put(new_module_name, new_model);
+//		time_frame.put(new_module_name, new_model);
 		return new_model;
 	}
 
@@ -364,7 +377,7 @@ public class Verilog {
 	 * @return 新しく作り直した回路
 	 */
 	public ArrayList<String> insertStuck( String new_module_name, String signal, int value  ) {
-		ArrayList<String> new_model = _setNewModule(new_module_name);
+		ArrayList<String> new_model = getModuleWithNewName(new_module_name);
 		String gate = _getGatePort(signal)[0];
 		String port = _getGatePort(signal)[1];
 
@@ -379,7 +392,8 @@ public class Verilog {
 				if( port_macher.matches() ) {
 					// 決め打ち！カッコワルイ・・・
 					if( port.contains("Z") || port.contains("Y") ) {
-						s = s.replaceFirst("\\."+port+"\\(\\s*"+port_macher.group(1)+"\\s*\\)",
+						String t = "wire "+port_macher.group(1).replaceAll("\\s+", "")+"_stuck;\n";
+						s = t+s.replaceFirst("\\."+port+"\\(\\s*"+port_macher.group(1)+"\\s*\\)",
 								"."+port+"( "+port_macher.group(1).replaceAll("\\s+", "")+"_stuck )");
 						s += "\n";
 						s += "assign " + port_macher.group(1) + " = 1'b" + value + ";";
@@ -401,34 +415,8 @@ public class Verilog {
 			}
 			new_model.set(i, s);
 		}
-		time_frame.put(new_module_name, new_model);
+//		time_frame.put(new_module_name, new_model);
 		return new_model;
-	}
-
-	/**
-	 * 新しいモジュール名で回路をコピーします
-	 * もしその名前があればその回路そのものを返します
-	 * @param new_module_name 新しく作りたい回路のモジュール名
-	 * @return 回路のコピー（文字列）
-	 */
-	private ArrayList<String> _setNewModule( String new_module_name ) {
-		ArrayList<String> new_model = null;
-		if( this.getModuleName().equals(new_module_name) ) {
-			new_model = result;
-		} else if( time_frame.containsKey(new_module_name) ) {
-			new_model = time_frame.get(new_module_name);
-		} else {
-			new_model = new ArrayList<String>();
-			for( String s: result ) {
-				Matcher modname_macher = modname_regex.matcher(s);
-				if( modname_macher.matches() ) {
-					new_model.add("module "+new_module_name+" ("+modname_macher.group(2)+");");
-				} else {
-					new_model.add(s);
-				}
-			}
-		}
-		return( new_model );
 	}
 
 	/**
@@ -459,15 +447,14 @@ public class Verilog {
 	}
 
 	/**
-	 * Verilogネットリストをモジュール名を変更して取得します
-	 * @param new_module_name 新しいモジュール名
-	 * @return 新しいモジュール名となったネットリスト
+	 * 新しいモジュール名で回路をコピーします
+	 * もしその名前がトップモジュールであればその回路そのものをコピーせずに返します
+	 * @param new_module_name 新しく作りたい回路のモジュール名
+	 * @return 回路のコピー（文字列）
 	 */
-	public ArrayList<String> getVerilogNetListWith( String new_module_name ) {
-		if( time_frame.containsKey(new_module_name) ) {
-			return(time_frame.get(new_module_name));
-		}
-		ArrayList<String> new_model = new ArrayList<String>();
+	public ArrayList<String> getModuleWithNewName( String new_module_name ) {
+		ArrayList<String> new_model = null;
+		new_model = new ArrayList<String>();
 		for( String s: result ) {
 			Matcher modname_macher = modname_regex.matcher(s);
 			if( modname_macher.matches() ) {
@@ -476,7 +463,7 @@ public class Verilog {
 				new_model.add(s);
 			}
 		}
-		return new_model;
+		return( new_model );
 	}
 
 	public String getModuleName() {

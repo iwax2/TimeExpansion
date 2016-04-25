@@ -100,7 +100,7 @@ public class ExpansionConf {
 				inv_type = inv_definition_matcher.group(1).replaceAll("\\s", "");
 				Pattern  inv_input_regex = Pattern.compile(".*input\\s+(\\w+)\\s*");
 				Pattern inv_output_regex = Pattern.compile(".*output\\s+(\\w+)\\s*");
-				while( !file.get(i++).contains("}") ) {
+				while( !file.get(++i).contains("}") ) {
 					Matcher  inv_input_matcher = inv_input_regex.matcher(file.get(i));
 					Matcher inv_output_matcher = inv_output_regex.matcher(file.get(i));
 					if( inv_input_matcher.matches() ) {

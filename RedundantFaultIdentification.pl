@@ -6,7 +6,8 @@ use strict;
 use Time::HiRes;  
 
 my $usage = "usage: RedundantFaultIdentification <fault_list.flt>";
-my $version = "Redundant fault Identification using Formality ver-1.0a @ Apr. 22, 2016";
+#my $version = "Redundant fault Identification using Formality ver-1.0a @ Apr. 22, 2016"; # とりあえず完成
+my $version = "Redundant fault Identification using Formality ver-1.1a @ Apr. 27, 2016"; # どれぐらい終わったか見せる
 my $output_file = "RedundantFaultIdentificationResult.csv";
 
 my $clock_pins = "clock, reset";
@@ -23,34 +24,58 @@ if( $ARGV[0] eq "" ) {
 }
 my $top_module = substr($ARGV[0], 0, index($ARGV[0], "_"));
 
+my $no_fm_check = 0;
+
+my @fault_list = ();
 open(IN, $ARGV[0] ) or die("Cannot open file, $ARGV[0]");
 while(<IN>) {
 	my $c_fault = $_;
 	chomp($c_fault);
+	push(@fault_list, $c_fault);
+	if( &shortenFault($c_fault) ne "--" ) {
+		$no_fm_check++;
+	}
+}
+close(IN);
+
+
+my $prev_pattern = "";
+my $index_fm_check = 0;
+foreach my $c_fault ( @fault_list ) {
 	my $s_fault = &shortenFault($c_fault);
 	if( $s_fault ) {
-		&writeExpansionConf("expansion.conf", $top_module, $c_fault );
-		system("/cad/local/bin/time_expansion expansion.conf");
-		&writeFormalityTCL("fm_check.tcl",    $top_module, $s_fault );
-		print("fm_shell -f fm_check.tcl with $s_fault\n");
-		system("fm_shell -f fm_check.tcl > formality.log");
-		my $pattern = &readEquivalentCheckResult( $top_module, $s_fault );
+		my $pattern = "";
+		if( $s_fault eq "--" ) {
+			$pattern = $prev_pattern;
+		} else {
+			&writeExpansionConf("expansion.conf", $top_module, $c_fault );
+			system("/cad/local/bin/time_expansion expansion.conf");
+			&writeFormalityTCL("fm_check.tcl",    $top_module, $s_fault );
+			printf("[%d/%d] fm_shell -f fm_check.tcl with $s_fault\n", $index_fm_check++, $no_fm_check);
+			system("fm_shell -f fm_check.tcl > formality.log");
+			$pattern = &readEquivalentCheckResult( $top_module, $s_fault );
+			$prev_pattern = $pattern;
+		}
 		if( $pattern eq "redundant" ) {
 			$redundant_fault++;
 		}
 		push( @identification_results, "$s_fault, $pattern" );
 	}
 }
-close(IN);
+
 
 open(OUTF, "> $output_file" ) or die("Cannot open file, $output_file");
 foreach my $s ( @identification_results ) {
 	print OUTF ("$s\n");
 }
+printf OUTF ("Total %d faults in the fault list\n", $#identification_results+1);
+printf OUTF ("\tThe number of  detected fault is %d. ( %0.2f [%] )\n", ($#identification_results+1-$redundant_fault), ($#identification_results+1-$redundant_fault)/($#identification_results+1)*100 );
+printf OUTF ("\tThe number of redandant fault is $redundant_fault. ( %0.2f [%] )\n", $redundant_fault/($#identification_results+1)*100 );
 close(OUTF);
 
 printf("Total %d faults in the fault list\n", $#identification_results+1);
 printf("\tElapsed time is %0.3f sec\n", Time::HiRes::time - $start_time);
+printf("\tThe number of  detected fault is %d. ( %0.2f [%] )\n", ($#identification_results+1-$redundant_fault), ($#identification_results+1-$redundant_fault)/($#identification_results+1)*100 );
 printf("\tThe number of redandant fault is $redundant_fault. ( %0.2f [%] )\n", $redundant_fault/($#identification_results+1)*100 );
 
 exit(0);
@@ -175,14 +200,14 @@ sub shortenFault() {
 	my ($strf, $class, $port) = split(/\s+/, $fault);
 	if( $fault =~ /^\s*#/ || $fault =~ /^\s*$/ ) {
 		return undef;
-	} elsif( $class =~ /N[DCO]/ ) {
+	} elsif( $class =~ /[A-Z][A-Z]/ ) {
 		$port =~ s|/|_|g;
 		return( $strf."_$port" );
 	} elsif( $class eq "--"  ) {
-		return undef;
+		return( $class );
 	} else {
 		print("Cannot analyze this fault, $fault\n");
-#		exit(0);
+		exit(0);
 	}
 	return undef;
 }

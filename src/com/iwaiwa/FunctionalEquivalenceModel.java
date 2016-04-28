@@ -37,8 +37,10 @@ public class FunctionalEquivalenceModel {
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(file));
 			for( String s : result ) {
-				bw.write(Verilog.clearLine80(s));
-				bw.newLine();
+				for( String t : s.split("\n") ) {
+					bw.write(Verilog.clearLine80(t));
+					bw.newLine();
+				}
 			}
 			bw.close();
 		} catch( Exception e ) { e.printStackTrace(); }

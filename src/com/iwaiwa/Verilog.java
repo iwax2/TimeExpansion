@@ -494,10 +494,21 @@ public class Verilog {
 	 * @return 80文字で改行した文字列
 	 */
 	public static String clearLine80 ( String long_term ) {
-		if( long_term.length() > 80 ) {
+		int sep = 200;
+		if( long_term.length() > sep ) {
 			StringBuffer st = new StringBuffer();
-			int p = long_term.lastIndexOf(",",80)+2;
-			int li = 0;
+			String[] separated = long_term.split("\\s*,\\s*");
+			int ln=1;
+			for( String s: separated ) {
+				st.append(s);
+				st.append(", ");
+				if( st.length() >= sep*ln ) {
+					st.append("\n");
+					ln++;
+				}
+			}
+			String str = st.substring(0, st.lastIndexOf(", "));
+			/*
 			while( (long_term.length()-p) > 80 ) {
 				st.append(long_term.substring(li,p));
 				st.append("\n");
@@ -505,7 +516,8 @@ public class Verilog {
 				p = long_term.lastIndexOf(",",li+80)+2;
 			}
 			st.append(long_term.substring(li));
-			return(st.toString());
+			*/
+			return(str);
 		}
 
 		return long_term;

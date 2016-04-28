@@ -1,20 +1,23 @@
 #!/usr/bin/perl
 # 片山さんの手法で、等価検証ツールを使ってガンガン冗長判定します
-# exec with nohup /usr/bin/time -ao RedundantFaultIdentificationResult.csv perl RedundantFaultIdentification.pl b04_AL10_ND.flt &> nohup_b04.out &
+# exec with export CN=b14;nohup /usr/bin/time -ao RedundantFaultIdentificationResult.csv perl ../RedundantFaultIdentification.pl ${CN}_AL10/${CN}_AL10_ND.flt &> nohup_${CN}.out &
 
 use strict;
-use Time::HiRes;  
+use Time::HiRes;
+use Time::Piece;
 
 my $usage = "usage: RedundantFaultIdentification <fault_list.flt>";
 #my $version = "Redundant fault Identification using Formality ver-1.0a @ Apr. 22, 2016"; # とりあえず完成
-my $version = "Redundant fault Identification using Formality ver-1.1a @ Apr. 27, 2016"; # どれぐらい終わったか見せる
+#my $version = "Redundant fault Identification using Formality ver-1.1a @ Apr. 27, 2016"; # どれぐらい終わったか見せる
+#my $version = "Redundant fault Identification using Formality ver-1.1.1a @ Apr. 28, 2016"; # 結果も表示する
+my $version = "Redundant fault Identification using Formality ver-1.2a @ Apr. 28, 2016"; # 予測終了時間を表示
 my $output_file = "RedundantFaultIdentificationResult.csv";
 
 my $clock_pins = "clock, reset";
 
 my $redundant_fault = 0;
 my @identification_results = ();
-my $start_time = Time::HiRes::time;  
+my $start_time = Time::HiRes::time;
 my $FALSE = 0;
 my $TRUE = !$FALSE;
 
@@ -40,21 +43,41 @@ close(IN);
 
 
 my $prev_pattern = "";
-my $index_fm_check = 0;
+my $index_fm_check = 1;
 foreach my $c_fault ( @fault_list ) {
 	my $s_fault = &shortenFault($c_fault);
 	if( $s_fault ) {
 		my $pattern = "";
+		my $prev_time = Time::HiRes::time;
 		if( $s_fault eq "--" ) {
 			$pattern = $prev_pattern;
 		} else {
 			&writeExpansionConf("expansion.conf", $top_module, $c_fault );
-			system("/cad/local/bin/time_expansion expansion.conf");
+			my $te_log = `/cad/local/bin/time_expansion expansion.conf`;
+			if( index($te_log, "Exception") >= 0 ) {
+				print("Some error occured in executing time_expansion\n");
+				print("$te_log\n");
+				exit(0);
+			}
 			&writeFormalityTCL("fm_check.tcl",    $top_module, $s_fault );
-			printf("[%d/%d] fm_shell -f fm_check.tcl with $s_fault\n", $index_fm_check++, $no_fm_check);
-			system("fm_shell -f fm_check.tcl > formality.log");
+			printf("[%5d/%5d] fm_shell -f fm_check.tcl with $s_fault -> ", $index_fm_check++, $no_fm_check);
+			my $fm_log = `fm_shell -f fm_check.tcl`;
+			if( index($fm_log, "Error:") >= 0 ) {
+				print("Some error occured in executing fm_shell\n");
+				print("$fm_log\n");
+				exit(0);
+			}
 			$pattern = &readEquivalentCheckResult( $top_module, $s_fault );
 			$prev_pattern = $pattern;
+			my $now = Time::HiRes::time;
+			my $rate = $index_fm_check/$no_fm_check; # 処理済みの割合
+			my $rem = ($now-$start_time)*(1-$rate)/$rate; # 残りの予測実時間(s)
+			my $t = localtime();
+			$t += int($rem);
+			$t->strftime('%m/%d, %Y %H:%M:%S');
+			printf("$pattern ( identified in %0.3f sec )\n", $now-$prev_time);
+			printf("[%10.2f\%] Estimated finish time is $t (about %.1f min to go)\n", $rate*100, $rem/60 );
+			$prev_time = $now;
 		}
 		if( $pattern eq "redundant" ) {
 			$redundant_fault++;
@@ -180,9 +203,9 @@ sub writeFormalityTCL() {
 open(OUTF, "> $file" ) or die("Cannot open file, $file");
 print OUTF <<EOFTCL;
 read_db /cad/Synopsys/Synthesis/A-2007.12-SP3/libraries/syn/class.db
-read_verilog -r $output_verilog
+read_verilog -r -netlist $output_verilog
 set_top $ref_module
-read_verilog -i $output_verilog
+read_verilog -i -netlist $output_verilog
 set_top $imp_module
 match
 #report_unmatched_points > b04_form_unmatched_points_001.txt

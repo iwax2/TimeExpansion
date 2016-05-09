@@ -7,7 +7,8 @@ public class TimeExpansion {
 	public static String usage = "usage: time_expansion [expansion.conf]";
 //	public static String version = "time_expansion ver-1.0a @ Apr. 22, 2016"; // いちおうできた
 //	public static String version = "time_expansion ver-1.0.1a @ Apr. 28, 2016"; // clear80Lineのバグつぶし
-	public static String version = "time_expansion ver-1.0.2a @ Apr. 28, 2016"; // ↑つぶせてなかった
+//	public static String version = "time_expansion ver-1.0.2a @ Apr. 28, 2016"; // ↑つぶせてなかった
+	public static String version = "time_expansion ver-1.1.0a @ May. 9, 2016"; // 配列表現に対応
 
 	/**
 	 * @param args 引数<br>

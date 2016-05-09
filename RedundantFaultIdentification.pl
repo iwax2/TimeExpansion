@@ -1,25 +1,29 @@
 #!/usr/bin/perl
 # 片山さんの手法で、等価検証ツールを使ってガンガン冗長判定します
-# exec with export CN=b14;nohup /usr/bin/time -ao RedundantFaultIdentificationResult.csv perl ../RedundantFaultIdentification.pl ${CN}_AL10/${CN}_AL10_ND.flt &> nohup_${CN}.out &
+# exec with export CN=b14;nohup /usr/bin/time -ao k-fm_summary.log perl ../RedundantFaultIdentification.pl ${CN}_AL10/${CN}_AL10_ND.flt &> nohup_${CN}.out &
 
 use strict;
 use Time::HiRes;
 use Time::Piece;
 
 my $usage = "usage: RedundantFaultIdentification <fault_list.flt>";
-#my $version = "Redundant fault Identification using Formality ver-1.0a @ Apr. 22, 2016"; # とりあえず完成
-#my $version = "Redundant fault Identification using Formality ver-1.1a @ Apr. 27, 2016"; # どれぐらい終わったか見せる
-#my $version = "Redundant fault Identification using Formality ver-1.1.1a @ Apr. 28, 2016"; # 結果も表示する
-my $version = "Redundant fault Identification using Formality ver-1.2a @ Apr. 28, 2016"; # 予測終了時間を表示
-my $output_file = "RedundantFaultIdentificationResult.csv";
+my $program = "Redundant fault Identification using Formality";
+#my $version = "$program ver-1.0a   @ Apr. 22, 2016"; # とりあえず完成
+#my $version = "$program ver-1.1a   @ Apr. 27, 2016"; # どれぐらい終わったか見せる
+#my $version = "$program ver-1.1.1a @ Apr. 28, 2016"; # 結果も表示する
+#my $version = "$program ver-1.2a   @ Apr. 28, 2016"; # 予測終了時間を表示
+my $version = "$program ver-1.2.1a @ May. 9, 2016"; # 冗長判定結果の収集方法が間違えていたので修正
 
-my $clock_pins = "clock, reset";
+my $output_file = "k-fm_summary.log";
+my $clock_pins = "CLOCK, RESET";
+#my $clock_pins = "clock, reset";
 
 my $redundant_fault = 0;
 my @identification_results = ();
 my $start_time = Time::HiRes::time;
 my $FALSE = 0;
 my $TRUE = !$FALSE;
+my $DEBUG = $FALSE;
 
 if( $ARGV[0] eq "" ) {
 	print("$usage\n");
@@ -40,6 +44,7 @@ while(<IN>) {
 	}
 }
 close(IN);
+system("rm -f f*"); # Formalityが勝手にファイルを作るので削除
 
 
 my $prev_pattern = "";
@@ -60,8 +65,13 @@ foreach my $c_fault ( @fault_list ) {
 				exit(0);
 			}
 			&writeFormalityTCL("fm_check.tcl",    $top_module, $s_fault );
-			printf("[%5d/%5d] fm_shell -f fm_check.tcl with $s_fault -> ", $index_fm_check++, $no_fm_check);
-			my $fm_log = `fm_shell -f fm_check.tcl`;
+			printf("[%5d/%5d] fm_shell -f fm_check.tcl with $s_fault -> \n", $index_fm_check, $no_fm_check);
+			my $fm_log = "";
+			if( $DEBUG ) {
+				system("fm_shell -f fm_check.tcl");
+			} else {
+				$fm_log = `fm_shell -f fm_check.tcl`;
+			}
 			if( index($fm_log, "Error:") >= 0 ) {
 				print("Some error occured in executing fm_shell\n");
 				print("$fm_log\n");
@@ -74,18 +84,17 @@ foreach my $c_fault ( @fault_list ) {
 			my $rem = ($now-$start_time)*(1-$rate)/$rate; # 残りの予測実時間(s)
 			my $t = localtime();
 			$t += int($rem);
-			$t->strftime('%m/%d, %Y %H:%M:%S');
-			printf("$pattern ( identified in %0.3f sec )\n", $now-$prev_time);
-			printf("[%10.2f\%] Estimated finish time is $t (about %.1f min to go)\n", $rate*100, $rem/60 );
+			printf("\t$pattern ( identified in %0.3f sec )\n", $now-$prev_time);
+			printf("[%10.2f\%] Estimated finish time is %s (about %.1f min to go)\n", $rate*100, $t->strftime('%m/%d, %Y %H:%M:%S'), $rem/60 );
 			$prev_time = $now;
+			$index_fm_check++;
 		}
-		if( $pattern eq "redundant" ) {
+		if( index($pattern, "redundant") == 0 ) {
 			$redundant_fault++;
 		}
 		push( @identification_results, "$s_fault, $pattern" );
 	}
 }
-
 
 open(OUTF, "> $output_file" ) or die("Cannot open file, $output_file");
 foreach my $s ( @identification_results ) {
@@ -111,6 +120,7 @@ sub readEquivalentCheckResult() {
 	my $pattern_log = "test_patterns_".$top."_$fault.v";
 	my $pin = 0;
 	my $pattern = "redundant";
+	my $fail_out = "";
 	open(INF, $failing_log ) or die("Cannot open file, $failing_log\n");
 	while(<INF>) {
 		my $line = $_;
@@ -130,11 +140,12 @@ sub readEquivalentCheckResult() {
 			chomp($line);
 			if( (index($line,"//Pattern")==0) && !(index($line,"tp_imp")>=0) && !(index($line,"tp_ref")>=0) ) {
 				# tp_impとtp_refを含んでいないやつ
-				if( $line =~ /Pattern \d+ sensitizes/ ) {
+				if( $line =~ /Pattern \d+ sensitizes\s+(\S+)/ ) {
+					$fail_out = $1;
 					$flag = $TRUE;
 				}
 			} elsif( $flag ) {
-				$pattern = $line;
+				$pattern = "$line detects @ $fail_out";
 				$flag = $FALSE;
 			}
 		}

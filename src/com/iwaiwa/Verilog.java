@@ -390,15 +390,16 @@ public class Verilog {
 			if( signal_gate_macher.matches() ) {
 				Matcher port_macher = Pattern.compile(".*\\."+port+"\\((.+?)\\).*").matcher(signal_gate_macher.group(2));
 				if( port_macher.matches() ) {
+					String w = port_macher.group(1).replaceAll("\\[", "\\\\[").replaceAll("\\]", "\\\\]");
 					// 決め打ち！カッコワルイ・・・
 					if( port.contains("Z") || port.contains("Y") ) {
 						String t = "wire "+port_macher.group(1).replaceAll("\\s+", "")+"_stuck;\n";
-						s = t+s.replaceFirst("\\."+port+"\\(\\s*"+port_macher.group(1)+"\\s*\\)",
+						s = t+s.replaceFirst("\\."+port+"\\(\\s*"+w+"\\s*\\)",
 								"."+port+"( "+port_macher.group(1).replaceAll("\\s+", "")+"_stuck )");
 						s += "\n";
 						s += "assign " + port_macher.group(1) + " = 1'b" + value + ";";
 					} else {
-						s = s.replaceFirst("\\."+port+"\\(\\s*"+port_macher.group(1)+"\\s*\\)",
+						s = s.replaceFirst("\\."+port+"\\(\\s*"+w+"\\s*\\)",
 								"."+port+"( 1'b"+value+" )");
 					}
 				} else {

@@ -29,6 +29,9 @@ if( $ARGV[0] eq "" ) {
 	print("$usage\n");
 	exit(0);
 }
+if( $ARGV[1] eq "-d" ) {
+	$DEBUG = $TRUE;
+}
 my $top_module = substr($ARGV[0], 0, index($ARGV[0], "_"));
 
 my $no_fm_check = 0;
@@ -151,8 +154,10 @@ sub readEquivalentCheckResult() {
 		}
 		close(INP);
 	}
-	unlink $failing_log;
-	unlink $pattern_log;
+	unless( $DEBUG ) {
+		unlink $failing_log;
+		unlink $pattern_log;
+	}
 	return $pattern;
 }
 

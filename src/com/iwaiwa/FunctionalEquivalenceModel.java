@@ -60,16 +60,25 @@ public class FunctionalEquivalenceModel {
 			fault = tf_match.group(1);
 			wire  = tf_match.group(3);
 			int sa_value = (fault.equals("str"))?0:1; // strなら固定値、縮退故障ともに0, stfなら1
-			ArrayList<String> t1 = comb_circuit.addObservationPoint( module_name_t1, wire, sa_value );
+
+			// May 12, 2016 固定させたい値に合わせてAND/ORゲートを入れる方式に変更したので、t1の縮退点は入れない
+			ArrayList<String> t1 = comb_circuit.addObservationPoint( module_name_t1, wire, -1 );
+//			ArrayList<String> t1 = comb_circuit.addObservationPoint( module_name_t1, wire, sa_value );
 			ArrayList<String> t2_ref = comb_circuit.getModuleWithNewName( module_name_t2r );
 			ArrayList<String> t2_imp = comb_circuit.insertStuck( module_name_t2i, wire, sa_value );
 			TimeExpansionModel ref = new TimeExpansionModel(comb_circuit, module_name_ref, module_name_t1, module_name_t2r);
 			ref.setModule_t1(t1);
 			ref.setModule_t2(t2_ref);
+			ref.expandWithBroadSide();
+			ref.insertObservationPointTo(module_name_t1, comb_circuit.getTestPointName(wire));
+			ref.insertStuckGate(module_name_t2r, comb_circuit.getTestPointName(wire), sa_value);
 			_generateRefModule(ref);
 			TimeExpansionModel imp = new TimeExpansionModel(comb_circuit, module_name_imp, module_name_t1, module_name_t2i);
 			imp.setModule_t1(t1);
 			imp.setModule_t2(t2_imp);
+			imp.expandWithBroadSide();
+			imp.insertObservationPointTo(module_name_t1, comb_circuit.getTestPointName(wire));
+			imp.insertStuckGate(module_name_t2i, comb_circuit.getTestPointName(wire), sa_value);
 			_generateImpModule(imp);
 		} else {
 			System.out.println("Error: Cannot analyze the following fault desicription.");
@@ -78,11 +87,9 @@ public class FunctionalEquivalenceModel {
 	}
 
 	private void _generateRefModule( TimeExpansionModel ref ) {
-		ref.expandWithBroadSide();
-		ref.addPort("tp_ref, tp_imp", "out");
-		ref.insertObservationPointTo(module_name_t1, comb_circuit.getTestPointName(wire), comb_circuit.getStuckAtName(wire));
-		ref.connectObservationPoint(comb_circuit.getTestPointName(wire), "tp_ref");
-		ref.connectObservationPoint(comb_circuit.getStuckAtName(wire),   "tp_imp");
+//		ref.addPort("tp_ref, tp_imp", "out");
+//		ref.insertObservationPointTo(module_name_t1, comb_circuit.getTestPointName(wire), comb_circuit.getStuckAtName(wire));
+//		ref.connectObservationPoint(comb_circuit.getStuckAtName(wire),   "tp_imp");
 		for( String s: ref.getTopmodule() ) {
 			result.add(s);
 		}
@@ -97,11 +104,10 @@ public class FunctionalEquivalenceModel {
 		result.add("");
 	}
 	private void _generateImpModule( TimeExpansionModel imp ) {
-		imp.expandWithBroadSide();
-		imp.addPort("tp_ref, tp_imp", "out");
-		imp.insertObservationPointTo(module_name_t1, comb_circuit.getTestPointName(wire), comb_circuit.getStuckAtName(wire));
-		imp.connectObservationPoint(comb_circuit.getStuckAtName(wire),   "tp_ref");
-		imp.connectObservationPoint(comb_circuit.getTestPointName(wire), "tp_imp");
+//		imp.addPort("tp_ref, tp_imp", "out");
+//		imp.insertObservationPointTo(module_name_t1, comb_circuit.getTestPointName(wire), comb_circuit.getStuckAtName(wire));
+//		imp.connectObservationPoint(comb_circuit.getStuckAtName(wire),   "tp_ref");
+//		imp.connectObservationPoint(comb_circuit.getTestPointName(wire), "tp_imp");
 		for( String s: imp.getTopmodule() ) {
 			result.add(s);
 		}

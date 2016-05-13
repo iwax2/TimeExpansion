@@ -196,6 +196,7 @@ public class Verilog {
 				String ff_type = input_match.group(1);
 				String instance_name = input_match.group(2);
 				for( String pin : input_match.group(3).split(",") ) {
+//					System.out.println("Target FF is : "+ff);
 					this.connectPPIs(ff_type, instance_name, pin);
 					this.connectPPOs(ff_type, instance_name, pin);
 				}
@@ -224,6 +225,7 @@ public class Verilog {
 				+expansion_conf.getInv_input()+"( ppi_" + instance_name + " ), ."
 				+expansion_conf.getInv_output()+"( " + qn_match.group(1) + " ) );");
 			number_of_additional_inv++;
+//			System.out.println(instance_name+" of QN is "+qn_match.group(1)+" with "+internal_pin);
 		}
 	}
 	/**
@@ -302,6 +304,7 @@ public class Verilog {
 	 * 片山さんの手法で等価検証ツールでt=1回路の対象信号線に値を固定させたいとき、
 	 * sa(縮退)_ゲート名_ポート名 という新たなポートを追加して、それに固定値をassignします。
 	 * 対象信号線に観測点は追加されていると思うけど、もう一方の回路の観測点の値を固定させます
+	 *
 	 * @param new_module_name 新しい回路のモジュール名
 	 * @param signal 値を固定する信号線名 ゲート名/ポート名 で指定してください（空白は除去しておいてね）
 	 * @param value 固定させる値、0,1なら等価検証を使ってやります -1 なら観測点のみ追加します

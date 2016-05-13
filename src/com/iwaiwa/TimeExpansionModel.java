@@ -3,6 +3,8 @@ package com.iwaiwa;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class TimeExpansionModel {
 	private Verilog v = null;
@@ -18,6 +20,7 @@ public class TimeExpansionModel {
 	private ArrayList<String> topmodule = null;
 	private ArrayList<String> module_t1 = null;
 	private ArrayList<String> module_t2 = null;
+	private ArrayList<String> stuckgate = new ArrayList<String>();
 
 	public TimeExpansionModel( Verilog v ) {
 		this.v = v;
@@ -82,9 +85,9 @@ public class TimeExpansionModel {
 		for( String in: v.getPp_names().getPpis() ) {
 			wire_definition.add("\twire " + in.replaceFirst("]", "] ").replaceAll("pp[io]_", "")+";");
 		}
-		for( String out: v.getPp_names().getPos() ) {
-			output_definition.add("\toutput " + out.replaceFirst("]", "] ")+"_t1;");
-		}
+//		for( String out: v.getPp_names().getPos() ) {
+//			output_definition.add("\toutput " + out.replaceFirst("]", "] ")+"_t1;");
+//		}
 		for( String out: v.getPp_names().getPos() ) {
 			output_definition.add("\toutput " + out.replaceFirst("]", "] ")+"_t2;");
 		}
@@ -123,11 +126,11 @@ public class TimeExpansionModel {
 		}
 		for( String out: v.getPp_names().getPos() ) {
 			out = out.replaceFirst("\\[\\d+:\\d+\\]", "");
-			t2_definition.add("\t." + out +"(" + out+"_t2), ");
+			t2_definition.add("\t." + out +"( sg_" + out+"_t2), ");
 		}
 		for( String out: v.getPp_names().getPpos() ) {
 			out = out.replaceFirst("\\[\\d+:\\d+\\]", "");
-			t2_definition.add("\t." + out +"(" + out+"_t2), ");
+			t2_definition.add("\t." + out +"( sg_" + out+"_t2), ");
 		}
 		last_line = t2_definition.remove(t2_definition.size()-1);
 		t2_definition.add(last_line.substring(0, last_line.length()-2)+" );");
@@ -168,6 +171,9 @@ public class TimeExpansionModel {
 		for( String s: t2_definition ) {
 			topmodule.add(s);
 		}
+		for( String s: stuckgate ) {
+			topmodule.add(s);
+		}
 		topmodule.add("endmodule");
 
 		return topmodule;
@@ -176,13 +182,15 @@ public class TimeExpansionModel {
 	/**
 	 * 観測点と縮退点をモジュール呼び出し時に追加する
 	 * @param target_module 呼び出すモジュール名
-	 * @param
+	 * @param observation 追加する観測点
+	 * @param stuckat 追加する縮退点
 	 */
-	public void insertObservationPointTo( String target_module, String observation, String stuckat ) {
+	public void insertObservationPointTo( String target_module, String observation ) {
+//	public void insertObservationPointTo( String target_module, String observation, String stuckat ) {
 		if( target_module.equals(module_name_t1) ) {
 			String last_line = t1_definition.remove(t1_definition.size()-1);
-			t1_definition.add("\t." + observation +"(" + observation +"), ");
-			t1_definition.add("\t." + stuckat +"(" + stuckat +"), ");
+			t1_definition.add("\t." + observation + "(" + observation + "), ");
+//			t1_definition.add("\t." + stuckat + "(" + stuckat + "), ");
 			t1_definition.add(last_line);
 		} else {
 			System.out.println("そんなモジュール知りません！");
@@ -192,6 +200,52 @@ public class TimeExpansionModel {
 //			System.out.println(s);
 //		}
 		_completeVerilog();
+	}
+
+	/**
+	 * 観測点に論理値を固定するために、外部出力にAND(1固定)/OR(0固定)ゲートをかませます
+	 * @param target_module 呼び出すモジュール名
+	 * @param observation 観測点につながっている信号線名
+	 * @param stuck_value 縮退させたい値 (0ならORゲートが入って、1ならANDゲートが入ります)
+	 */
+	public void insertStuckGate( String target_module, String observation, int stuck_value ) {
+		wire_definition.add("\twire "+observation+";");
+		if( target_module.equals(module_name_t2) ) {
+			String stuck_gate = (stuck_value==0) ? "OR2" : "AN2";
+			Pattern array_regex = Pattern.compile("\\s*output\\s*\\[(\\d+):(\\d+)\\]\\s*(.+);.*");
+			Pattern   bit_regex = Pattern.compile("\\s*output\\s*(.+);.*");
+			int no_output = 0;
+			for( String out: output_definition ) {
+				Matcher array_matcher = array_regex.matcher(out);
+				Matcher bit_matcher = bit_regex.matcher(out);
+				if( array_matcher.matches() ) {
+					int msb = Integer.parseInt(array_matcher.group(1));
+					int lsb = Integer.parseInt(array_matcher.group(2));
+					String name = array_matcher.group(3);
+					wire_definition.add("\twire ["+msb+":"+lsb+"] sg_"+name+";");
+					for( int j=0; j<=msb-lsb; j++ ) {
+						String o = name+"["+j+"]";
+						String s = stuck_gate+" U"+no_output+" ( .A( "+observation+" ), .B( sg_"+o+" ), .Z( "+o+" ) );";
+//						assign_definition.add("\tassign "+o+" = sg_"+o+" ;");
+						stuckgate.add(s);
+						no_output++;
+					}
+				} else if( bit_matcher.matches() ) {
+					String name = bit_matcher.group(1);
+					String s = stuck_gate+" U"+no_output+" ( .A( "+observation+" ), .B( sg_"+name+" ), .Z( "+name+" ) );";
+					wire_definition.add("\twire sg_"+name+";");
+//					assign_definition.add("\tassign "+name+" = sg_"+name+" ;");
+					stuckgate.add(s);
+					no_output++;
+				} else {
+					System.out.println("Error: Cannot analyze the output line, "+out);
+				}
+			}
+			_completeVerilog();
+		} else {
+			System.out.println("そんなモジュール知りません！");
+			System.out.println(target_module);
+		}
 	}
 
 
@@ -226,6 +280,9 @@ public class TimeExpansionModel {
 	public ArrayList<String> getModule_t2() {
 		return module_t2;
 	}
+	public ArrayList<String> getStuckgate() {
+		return stuckgate;
+	}
 
 	/**
 	 * 時間展開モデルの上位層に外部入出力を付与します
@@ -235,7 +292,7 @@ public class TimeExpansionModel {
 	 */
 	public ArrayList<String> addPort( String name, String inout ) {
 		if( inout.equals("in") ) {
-			input_definition.add("");
+			input_definition.add("\tinput " + name + ";");
 		} else {
 			output_definition.add("\toutput " + name + ";");
 		}

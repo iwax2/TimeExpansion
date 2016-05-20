@@ -54,7 +54,7 @@ public class FunctionalEquivalenceModel {
 	 * 合わせて出力ファイル名は オリジナルの出力ファイル名_故障_信号線名.v に変更
 	 * @param wire 冗長判定したい対象の故障リスト中の単一遷移故障（stf   NO   U567/Z）など
 	 */
-	public void addEquivalentCheckModel( String transition_fault ) {
+	public void addEquivalentCheckModel( String transition_fault, boolean use_primary_io ) {
 		Matcher tf_match = Pattern.compile("\\s*(st[rf])\\s+(\\S+)\\s+(\\S+).*").matcher(transition_fault);
 		if( tf_match.matches() ) {
 			fault = tf_match.group(1);
@@ -69,14 +69,14 @@ public class FunctionalEquivalenceModel {
 			TimeExpansionModel ref = new TimeExpansionModel(comb_circuit, module_name_ref, module_name_t1, module_name_t2r);
 			ref.setModule_t1(t1);
 			ref.setModule_t2(t2_ref);
-			ref.expandWithBroadSide();
+			ref.expandWithBroadSide( use_primary_io );
 			ref.insertObservationPointTo(module_name_t1, comb_circuit.getTestPointName(wire));
 			ref.insertStuckGate(module_name_t2r, comb_circuit.getTestPointName(wire), sa_value);
 			_generateRefModule(ref);
 			TimeExpansionModel imp = new TimeExpansionModel(comb_circuit, module_name_imp, module_name_t1, module_name_t2i);
 			imp.setModule_t1(t1);
 			imp.setModule_t2(t2_imp);
-			imp.expandWithBroadSide();
+			imp.expandWithBroadSide( use_primary_io );
 			imp.insertObservationPointTo(module_name_t1, comb_circuit.getTestPointName(wire));
 			imp.insertStuckGate(module_name_t2i, comb_circuit.getTestPointName(wire), sa_value);
 			_generateImpModule(imp);

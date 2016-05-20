@@ -72,24 +72,29 @@ public class TimeExpansionModel {
 		} catch( Exception e ) { e.printStackTrace(); }
 	}
 
-	public void expandWithBroadSide() {
+	public void expandWithBroadSide( boolean use_pio ) {
 		for( String in: v.getPp_names().getPis() ) {
 			input_definition.add("\t input " + in.replaceFirst("]", "] ")+"_t1;");
 		}
-		for( String in: v.getPp_names().getPis() ) {
-			input_definition.add("\t input " + in.replaceFirst("]", "] ")+"_t2;");
+		if( use_pio ) {
+			for( String in: v.getPp_names().getPis() ) {
+				input_definition.add("\t input " + in.replaceFirst("]", "] ")+"_t2;");
+			}
+			for( String out: v.getPp_names().getPos() ) {
+				output_definition.add("\toutput " + out.replaceFirst("]", "] ")+"_t2;");
+			}
+		} else {
+			for( String in: v.getPp_names().getPis() ) {
+				String wire_name = in.replaceFirst("\\[\\d+:\\d+\\]", "");
+				wire_definition.add("\twire " + in.replaceFirst("]", "] ")+"_t2 ;");
+				assign_definition.add("\tassign " + wire_name +"_t2 = " + wire_name + "_t1;");
+			}
 		}
 		for( String in: v.getPp_names().getPpis() ) {
 			input_definition.add("\t input " + in.replaceFirst("]", "] ")+"_t1;");
 		}
 		for( String in: v.getPp_names().getPpis() ) {
 			wire_definition.add("\twire " + in.replaceFirst("]", "] ").replaceAll("pp[io]_", "")+";");
-		}
-//		for( String out: v.getPp_names().getPos() ) {
-//			output_definition.add("\toutput " + out.replaceFirst("]", "] ")+"_t1;");
-//		}
-		for( String out: v.getPp_names().getPos() ) {
-			output_definition.add("\toutput " + out.replaceFirst("]", "] ")+"_t2;");
 		}
 		for( String out: v.getPp_names().getPpos() ) {
 			output_definition.add("\toutput " + out.replaceFirst("]", "] ")+"_t2;");
@@ -104,10 +109,10 @@ public class TimeExpansionModel {
 			in = in.replaceFirst("\\[\\d+:\\d+\\]", "");
 			t1_definition.add("\t." + in +"(" + in + "_t1), ");
 		}
-		for( String out: v.getPp_names().getPos() ) {
-			out = out.replaceFirst("\\[\\d+:\\d+\\]", "");
-			t1_definition.add("\t." + out +"(" + out+"_t1), ");
-		}
+//		for( String out: v.getPp_names().getPos() ) {
+//			out = out.replaceFirst("\\[\\d+:\\d+\\]", "");
+//			t1_definition.add("\t." + out +"(" + out+"_t1), ");
+//		}
 		for( String out: v.getPp_names().getPpos() ) {
 			out = out.replaceFirst("\\[\\d+:\\d+\\]", "");
 			t1_definition.add("\t." + out +"(" + out.replaceAll("pp[io]_", "")+"), ");
@@ -124,9 +129,11 @@ public class TimeExpansionModel {
 			in = in.replaceFirst("\\[\\d+:\\d+\\]", "");
 			t2_definition.add("\t." + in +"(" + in.replaceAll("pp[io]_", "")+"), ");
 		}
-		for( String out: v.getPp_names().getPos() ) {
-			out = out.replaceFirst("\\[\\d+:\\d+\\]", "");
-			t2_definition.add("\t." + out +"( sg_" + out+"_t2), ");
+		if( use_pio ) {
+			for( String out: v.getPp_names().getPos() ) {
+				out = out.replaceFirst("\\[\\d+:\\d+\\]", "");
+				t2_definition.add("\t." + out +"( sg_" + out+"_t2), ");
+			}
 		}
 		for( String out: v.getPp_names().getPpos() ) {
 			out = out.replaceFirst("\\[\\d+:\\d+\\]", "");
@@ -136,6 +143,7 @@ public class TimeExpansionModel {
 		t2_definition.add(last_line.substring(0, last_line.length()-2)+" );");
 		_completeVerilog();
 	}
+
 
 	private ArrayList<String> _completeVerilog() {
 		topmodule = new ArrayList<String>();

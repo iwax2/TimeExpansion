@@ -9,7 +9,8 @@ public class TimeExpansion {
 //	public static String version = "time_expansion ver-1.0.1a @ Apr. 28, 2016"; // clear80Lineのバグつぶし
 //	public static String version = "time_expansion ver-1.0.2a @ Apr. 28, 2016"; // ↑つぶせてなかった
 //	public static String version = "time_expansion ver-1.1.0a @ May. 9, 2016";  // 配列表現に対応
-	public static String version = "time_expansion ver-1.2.0a @ May. 12, 2016"; // 縮退点ではダメだったのでAND/ORを入れる方式に変更
+//	public static String version = "time_expansion ver-1.2.0 @ May. 12, 2016"; // 縮退点ではダメだったのでAND/ORを入れる方式に変更
+	public static String version = "time_expansion ver-1.2.1 @ May. 20, 2016"; // nopi_changesに対応
 
 	/**
 	 * @param args 引数<br>
@@ -43,7 +44,7 @@ public class TimeExpansion {
 		v.generateCombCicuit();
 		if( ("BroadSide").equals(conf.getExpand_method()) ) { // broadside
 			TimeExpansionModel tem = new TimeExpansionModel(v);
-			tem.expandWithBroadSide();
+			tem.expandWithBroadSide( conf.use_primary_io() );
 			tem.writeVerilog( conf.getOutput_file() );
 //			tem.printVerilog();
 		} else if( ("SkewedLoad").equals(conf.getExpand_method()) ) {
@@ -51,7 +52,7 @@ public class TimeExpansion {
 		} else if( conf.getEquivalent_check() != null ) {
 			// 片山さんの遷移故障の冗長判定手法で使う equivalent-check <遷移故障名>
 			FunctionalEquivalenceModel fem = new FunctionalEquivalenceModel(v);
-			fem.addEquivalentCheckModel(conf.getEquivalent_check());
+			fem.addEquivalentCheckModel(conf.getEquivalent_check(), conf.use_primary_io());
 			fem.writeVerilog( conf.getOutput_file() );
 //			fem.printVerilog();
 		} else {

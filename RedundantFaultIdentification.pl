@@ -12,7 +12,8 @@ my $program = "Redundant fault Identification using Formality";
 #my $version = "$program ver-1.1a   @ Apr. 27, 2016"; # どれぐらい終わったか見せる
 #my $version = "$program ver-1.1.1a @ Apr. 28, 2016"; # 結果も表示する
 #my $version = "$program ver-1.2a   @ Apr. 28, 2016"; # 予測終了時間を表示
-my $version = "$program ver-1.2.1a @ May. 9, 2016"; # 冗長判定結果の収集方法が間違えていたので修正
+#my $version = "$program ver-1.2.1a @ May. 9, 2016"; # 冗長判定結果の収集方法が間違えていたので修正
+my $version = "$program ver-1.2.2 @ May. 20, 2016"; # Warningをだしていたときも出力するようにする
 
 my $output_file = "k-fm_summary.log";
 my $clock_pins = "CLOCK, RESET";
@@ -62,10 +63,18 @@ foreach my $c_fault ( @fault_list ) {
 		} else {
 			&writeExpansionConf("expansion.conf", $top_module, $c_fault );
 			my $te_log = `/cad/local/bin/time_expansion expansion.conf`;
-			if( index($te_log, "Exception") >= 0 ) {
+			if( index($te_log, "Exception") >= 0 || index($te_log, "Error:") >= 0 ) {
 				print("Some error occured in executing time_expansion\n");
 				print("$te_log\n");
 				exit(0);
+			}
+			if( index($te_log, "Warning") >= 0 ) {
+				print("There are some warnings occured in executing time_expansion\n");
+				print("$te_log\n");
+				$index_fm_check++;
+				$prev_time = Time::HiRes::time;
+				push( @identification_results, "$s_fault, ND" );
+				next;
 			}
 			&writeFormalityTCL("fm_check.tcl",    $top_module, $s_fault );
 			printf("[%5d/%5d] fm_shell -f fm_check.tcl with $s_fault -> \n", $index_fm_check, $no_fm_check);

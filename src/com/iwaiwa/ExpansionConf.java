@@ -15,6 +15,7 @@ public class ExpansionConf {
 	private String output_file = null;
 	private String top_module  = null;
 	private ArrayList<String> clock_pins = new ArrayList<String>();
+	private boolean use_primary_io = true;
 	private String equivalent_check = null;
 	private ArrayList<FFDefinition> ff_definitions = new ArrayList<FFDefinition>();
 	private String inv_type   = null;
@@ -40,6 +41,7 @@ public class ExpansionConf {
 		Pattern output_verilog_regex   = Pattern.compile("\\s*output-verilog\\s+(\\S+)\\s*");
 		Pattern top_module_regex       = Pattern.compile("\\s*top-module\\s+(\\S+)\\s*");
 		Pattern clock_pins_regex       = Pattern.compile("\\s*clock-pins\\s+(.+)\\s*");
+		Pattern use_primary_io_regex   = Pattern.compile("\\s*use-primary-io\\s+(.+)\\s*(#.*)?");
 		Pattern equivalent_check_regex = Pattern.compile("\\s*equivalent-check\\s+(.+)\\s*(#.*)?");
 		Pattern ff_definition_regex    = Pattern.compile("\\s*ff\\s+([^{]+).*");
 		Pattern inv_definition_regex   = Pattern.compile("\\s*inv\\s+([^{]+).*");
@@ -51,6 +53,7 @@ public class ExpansionConf {
 			Matcher output_verilog_matcher   = output_verilog_regex.matcher(line);
 			Matcher top_module_matcher       = top_module_regex.matcher(line);
 			Matcher clock_pins_matcher       = clock_pins_regex.matcher(line);
+			Matcher use_primary_io_matcher   = use_primary_io_regex.matcher(line);
 			Matcher equivalent_check_matcher = equivalent_check_regex.matcher(line);
 			Matcher ff_definition_matcher    = ff_definition_regex.matcher(line);
 			Matcher inv_definition_matcher   = inv_definition_regex.matcher(line);
@@ -85,6 +88,8 @@ public class ExpansionConf {
 				for( String p : clock_pins_matcher.group(1).replaceAll("\\s+", "").split(",") ) {
 					clock_pins.add(p);
 				}
+			} else if( use_primary_io_matcher.matches() ) {
+				use_primary_io = !use_primary_io_matcher.group(1).matches("[nN][oO]");
 			} else if( equivalent_check_matcher.matches() ) {
 				equivalent_check = equivalent_check_matcher.group(1);
 			} else if( ff_definition_matcher.matches() ) {
@@ -255,6 +260,11 @@ public class ExpansionConf {
 	public String getEquivalent_check() {
 		return equivalent_check;
 	}
+
+	public boolean use_primary_io() {
+		return use_primary_io;
+	}
+
 
 
 }

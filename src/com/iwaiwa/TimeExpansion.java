@@ -10,7 +10,8 @@ public class TimeExpansion {
 //	public static String version = "time_expansion ver-1.0.2a @ Apr. 28, 2016"; // ↑つぶせてなかった
 //	public static String version = "time_expansion ver-1.1.0a @ May. 9, 2016";  // 配列表現に対応
 //	public static String version = "time_expansion ver-1.2.0 @ May. 12, 2016"; // 縮退点ではダメだったのでAND/ORを入れる方式に変更
-	public static String version = "time_expansion ver-1.2.1 @ May. 20, 2016"; // nopi_changesに対応
+//	public static String version = "time_expansion ver-1.2.1 @ May. 20, 2016"; // nopi_changesに対応
+	public static String version = "time_expansion ver-1.2.2 @ May. 23, 2016"; // wire表現、output/input端子に対応
 
 	/**
 	 * @param args 引数<br>

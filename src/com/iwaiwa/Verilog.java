@@ -313,6 +313,7 @@ public class Verilog {
 	public ArrayList<String> addObservationPoint( String new_module_name, String signal, int value ) {
 		boolean use_ec = ( value==0 || value==1 );
 		ArrayList<String> new_model = getModuleWithNewName(new_module_name);
+		String pio_wire = signal.split("\\[")[0];
 		String gate = _getGatePort(signal)[0];
 		String port = _getGatePort(signal)[1];
 		String tp_name = getTestPointName(signal);
@@ -320,7 +321,7 @@ public class Verilog {
 
 		boolean output_def_flag = true;
 		Pattern signal_gate_regex = Pattern.compile("\\s*(\\w+)\\s+"+gate+"\\s*\\((.+)\\)\\s*;.*");
-		Pattern signal_wire_regex = Pattern.compile("\\s*wire.*"+gate+".*");
+		Pattern signal_wire_regex = Pattern.compile("\\s*(wire|input|output)(.*"+pio_wire+".*)");
 		for( int i=0; i<new_model.size(); i++ ) {
 			String s = new_model.get(i);
 			Matcher modname_macher = modname_regex.matcher(s);
@@ -348,8 +349,13 @@ public class Verilog {
 					System.out.println(s);
 				}
 			} else if( signal_wire_macher.matches() ) {
-				System.out.println("Warning: wire表現の故障リストにはまだ未対応ですぅ");
-				System.out.println(s);
+				String[] wires = signal_wire_macher.group(2).replaceAll("\\s+", "").replaceAll(";", "").replaceAll("\\[\\d+:\\d+\\]", "").split(",");
+				for( String w: wires ) {
+					if( w.equals(pio_wire)) {
+						s += "\n";
+						s += "assign " + tp_name + " = " + signal + ";";
+					}
+				}
 			} else if( s.matches("\\s*output\\s+.+\\s*;.*") && output_def_flag ) {
 				output_def_flag = false;
 				String temp = s;
@@ -383,9 +389,10 @@ public class Verilog {
 		ArrayList<String> new_model = getModuleWithNewName(new_module_name);
 		String gate = _getGatePort(signal)[0];
 		String port = _getGatePort(signal)[1];
+		String pio_wire = signal.split("\\[")[0];
 
 		Pattern signal_gate_regex = Pattern.compile("\\s*(\\w+)\\s+"+gate+"\\s*\\((.+)\\)\\s*;.*");
-		Pattern signal_wire_regex = Pattern.compile("\\s*wire.*"+gate+".*");
+		Pattern signal_wire_regex = Pattern.compile("\\s*(wire|input|output)(.*"+pio_wire+".*)");
 		for( int i=0; i<new_model.size(); i++ ) {
 			String s = new_model.get(i);
 			Matcher signal_gate_macher = signal_gate_regex.matcher(s);
@@ -413,8 +420,17 @@ public class Verilog {
 					System.out.println(s);
 				}
 			} else if( signal_wire_macher.matches() ) {
-				System.out.println("Warning: wire表現の故障リストにはまだ未対応ですぅ");
-				System.out.println(s);
+				// inputは全信号線を見直して置換しないといけないので面倒すぎた
+				//  -> nopi_changesではぜったいUDになるんだから何もしない作戦（refと同じ回路で）
+				if( signal_wire_macher.group(1).equals("wire") || signal_wire_macher.group(1).equals("output") ) {
+					String[] wires = signal_wire_macher.group(2).replaceAll("\\s+", "").replaceAll(";", "").replaceAll("\\[\\d+:\\d+\\]", "").split(",");
+					for( String w: wires ) {
+						if( w.equals(pio_wire)) {
+							s += "\n";
+							s += "assign " + signal + " = 1'b" + value + ";";
+						}
+					}
+				}
 			} else {
 				continue;
 			}
@@ -442,6 +458,7 @@ public class Verilog {
 		String gate = _getGatePort(signal)[0];
 		String port = _getGatePort(signal)[1];
 		String tp_name = (port==null)? "tp_"+gate : "tp_"+gate+"_"+port;
+		tp_name = tp_name.replaceAll("\\[", "_").replaceAll("\\]", "_");
 		return tp_name;
 	}
 	public String getStuckAtName( String signal ) {

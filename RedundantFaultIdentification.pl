@@ -13,18 +13,18 @@ my $program = "Redundant fault Identification using Formality";
 #my $version = "$program ver-1.1.1a @ Apr. 28, 2016"; # 結果も表示する
 #my $version = "$program ver-1.2a   @ Apr. 28, 2016"; # 予測終了時間を表示
 #my $version = "$program ver-1.2.1a @ May. 9, 2016"; # 冗長判定結果の収集方法が間違えていたので修正
-my $version = "$program ver-1.2.2 @ May. 20, 2016"; # Warningをだしていたときも出力するようにする
+#my $version = "$program ver-1.2.2 @ May. 20, 2016"; # Warningをだしていたときも出力するようにする
+my $version = "$program ver-1.2.3 @ May. 23, 2016"; # use-primary-ioの機能を追加
 
 my $output_file = "k-fm_summary.log";
-my $clock_pins = "CLOCK, RESET";
-#my $clock_pins = "clock, reset";
+my $clock_pins = "clock, reset";
 
 my $redundant_fault = 0;
 my @identification_results = ();
 my $start_time = Time::HiRes::time;
 my $FALSE = 0;
 my $TRUE = !$FALSE;
-my $DEBUG = $FALSE;
+Lmy $DEBUG = $FALSE;
 
 if( $ARGV[0] eq "" ) {
 	print("$usage\n");
@@ -34,6 +34,9 @@ if( $ARGV[1] eq "-d" ) {
 	$DEBUG = $TRUE;
 }
 my $top_module = substr($ARGV[0], 0, index($ARGV[0], "_"));
+if( $top_module eq "b04" || $top_module eq "b05" || $top_module eq "b08" || $top_module eq "b15" ) {
+	$clock_pins = "CLOCK, RESET";
+}
 
 my $no_fm_check = 0;
 
@@ -60,6 +63,12 @@ foreach my $c_fault ( @fault_list ) {
 		my $prev_time = Time::HiRes::time;
 		if( $s_fault eq "--" ) {
 			$pattern = $prev_pattern;
+		} elsif( $s_fault =~ "test_s[ieo]" ) {
+			$index_fm_check++;
+			$prev_time = Time::HiRes::time;
+			$prev_pattern = "Possibly detected by simulations.";
+			push( @identification_results, "$s_fault, $prev_pattern" );
+			next;
 		} else {
 			&writeExpansionConf("expansion.conf", $top_module, $c_fault );
 			my $te_log = `/cad/local/bin/time_expansion expansion.conf`;
@@ -71,10 +80,11 @@ foreach my $c_fault ( @fault_list ) {
 			if( index($te_log, "Warning") >= 0 ) {
 				print("There are some warnings occured in executing time_expansion\n");
 				print("$te_log\n");
-				$index_fm_check++;
-				$prev_time = Time::HiRes::time;
-				push( @identification_results, "$s_fault, ND" );
-				next;
+#				$index_fm_check++;
+#				$prev_time = Time::HiRes::time;
+#				push( @identification_results, "$s_fault, ND" );
+#				next;
+				exit(0);
 			}
 			&writeFormalityTCL("fm_check.tcl",    $top_module, $s_fault );
 			printf("[%5d/%5d] fm_shell -f fm_check.tcl with $s_fault -> \n", $index_fm_check, $no_fm_check);
@@ -185,6 +195,7 @@ input-verilog $input_verilog
 output-verilog $output_verilog
 top-module $top
 clock-pins $clock_pins
+use-primary-io no
 equivalent-check $fault
 inv IV {
     input A

@@ -422,7 +422,8 @@ public class Verilog {
 			} else if( signal_wire_macher.matches() ) {
 				// inputは全信号線を見直して置換しないといけないので面倒すぎた
 				//  -> nopi_changesではぜったいUDになるんだから何もしない作戦（refと同じ回路で）
-				if( signal_wire_macher.group(1).equals("wire") || signal_wire_macher.group(1).equals("output") ) {
+				// outputもおなじでいいかな・・・add_po_masksしてるし・・・
+				if( signal_wire_macher.group(1).equals("wire") ) {
 					String[] wires = signal_wire_macher.group(2).replaceAll("\\s+", "").replaceAll(";", "").replaceAll("\\[\\d+:\\d+\\]", "").split(",");
 					for( String w: wires ) {
 						if( w.equals(pio_wire)) {

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # 片山さんの手法で、等価検証ツールを使ってガンガン冗長判定します
-# exec with export CN=b14;nohup /usr/bin/time -ao k-fm_summary.log perl ../RedundantFaultIdentification.pl ${CN}_AL10/${CN}_AL10_ND.flt &> nohup_${CN}.out &
+# exec with export CN=b14;nohup /usr/bin/time -ao k-fm_summary_${CN}.csv perl ../RedundantFaultIdentification.pl ${CN}_AL10/${CN}_AL10_ND.flt &> nohup_k_${CN}.out &
 
 use strict;
 use Time::HiRes;
@@ -14,9 +14,11 @@ my $program = "Redundant fault Identification using Formality";
 #my $version = "$program ver-1.2a   @ Apr. 28, 2016"; # 予測終了時間を表示
 #my $version = "$program ver-1.2.1a @ May. 9, 2016"; # 冗長判定結果の収集方法が間違えていたので修正
 #my $version = "$program ver-1.2.2 @ May. 20, 2016"; # Warningをだしていたときも出力するようにする
-my $version = "$program ver-1.2.3 @ May. 23, 2016"; # use-primary-ioの機能を追加
+#my $version = "$program ver-1.2.3 @ May. 23, 2016"; # use-primary-ioの機能を追加
+my $version = "$program ver-1.3 @ May. 26, 2016"; # 各実行のCPU timeを取得する機能を追加
 
-my $output_file = "k-fm_summary.log";
+my $top_module = substr($ARGV[0], 0, index($ARGV[0], "_"));
+my $output_file = "k-fm_summary_$top_module.csv";
 my $clock_pins = "clock, reset";
 
 my $redundant_fault = 0;
@@ -24,7 +26,7 @@ my @identification_results = ();
 my $start_time = Time::HiRes::time;
 my $FALSE = 0;
 my $TRUE = !$FALSE;
-Lmy $DEBUG = $FALSE;
+my $DEBUG = $FALSE;
 
 if( $ARGV[0] eq "" ) {
 	print("$usage\n");
@@ -33,7 +35,6 @@ if( $ARGV[0] eq "" ) {
 if( $ARGV[1] eq "-d" ) {
 	$DEBUG = $TRUE;
 }
-my $top_module = substr($ARGV[0], 0, index($ARGV[0], "_"));
 if( $top_module eq "b04" || $top_module eq "b05" || $top_module eq "b08" || $top_module eq "b15" ) {
 	$clock_pins = "CLOCK, RESET";
 }
@@ -54,10 +55,13 @@ close(IN);
 system("rm -f f*"); # Formalityが勝手にファイルを作るので削除
 
 
+open(OUTCSV, "> $output_file" ) or die("Cannot open file, $output_file");
 my $prev_pattern = "";
 my $index_fm_check = 1;
 foreach my $c_fault ( @fault_list ) {
 	my $s_fault = &shortenFault($c_fault);
+	my $te_time = "";
+	my $fm_time = "";
 	if( $s_fault ) {
 		my $pattern = "";
 		my $prev_time = Time::HiRes::time;
@@ -67,11 +71,16 @@ foreach my $c_fault ( @fault_list ) {
 			$index_fm_check++;
 			$prev_time = Time::HiRes::time;
 			$prev_pattern = "Possibly detected by simulations.";
+			print OUTCSV ("$s_fault, $prev_pattern\n");
 			push( @identification_results, "$s_fault, $prev_pattern" );
 			next;
 		} else {
 			&writeExpansionConf("expansion.conf", $top_module, $c_fault );
-			my $te_log = `/cad/local/bin/time_expansion expansion.conf`;
+#			my $te_log = `/cad/local/bin/time_expansion expansion.conf`;
+			open(CMD, "/usr/bin/time /cad/local/bin/time_expansion expansion.conf 2>&1 |");
+			my $te_log = join("",<CMD>);
+			close(CMD);
+			$te_time = &getTimeCommandResult($te_log);
 			if( index($te_log, "Exception") >= 0 || index($te_log, "Error:") >= 0 ) {
 				print("Some error occured in executing time_expansion\n");
 				print("$te_log\n");
@@ -87,12 +96,16 @@ foreach my $c_fault ( @fault_list ) {
 				exit(0);
 			}
 			&writeFormalityTCL("fm_check.tcl",    $top_module, $s_fault );
-			printf("[%5d/%5d] fm_shell -f fm_check.tcl with $s_fault -> \n", $index_fm_check, $no_fm_check);
+			printf("[%5d/%5d] $s_fault -> ", $index_fm_check, $no_fm_check);
 			my $fm_log = "";
 			if( $DEBUG ) {
 				system("fm_shell -f fm_check.tcl");
 			} else {
-				$fm_log = `fm_shell -f fm_check.tcl`;
+#				$fm_log = `fm_shell -f fm_check.tcl`;
+				open(CMD, "/usr/bin/time fm_shell -f fm_check.tcl 2>&1 |");
+				$fm_log = join("",<CMD>);
+				close(CMD);
+				$fm_time = &getTimeCommandResult($fm_log);
 			}
 			if( index($fm_log, "Error:") >= 0 ) {
 				print("Some error occured in executing fm_shell\n");
@@ -106,26 +119,23 @@ foreach my $c_fault ( @fault_list ) {
 			my $rem = ($now-$start_time)*(1-$rate)/$rate; # 残りの予測実時間(s)
 			my $t = localtime();
 			$t += int($rem);
-			printf("\t$pattern ( identified in %0.3f sec )\n", $now-$prev_time);
-			printf("[%10.2f\%] Estimated finish time is %s (about %.1f min to go)\n", $rate*100, $t->strftime('%m/%d, %Y %H:%M:%S'), $rem/60 );
+			printf("%s (in %0.3fs)\n", ($pattern eq "redundant")?"redundant":"detectable", $now-$prev_time);
+			printf("[%5.2f\%] Estimated finish time is %s (about %s to go)\n", $rate*100, $t->strftime('%m/%d, %Y %H:%M:%S'), &normalizeTime($rem) );
 			$prev_time = $now;
 			$index_fm_check++;
 		}
 		if( index($pattern, "redundant") == 0 ) {
 			$redundant_fault++;
 		}
-		push( @identification_results, "$s_fault, $pattern" );
+		print OUTCSV ("$s_fault, $pattern, $te_time, $fm_time\n");
+		push( @identification_results, "$s_fault, $pattern, $te_time, $fm_time" );
 	}
 }
 
-open(OUTF, "> $output_file" ) or die("Cannot open file, $output_file");
-foreach my $s ( @identification_results ) {
-	print OUTF ("$s\n");
-}
-printf OUTF ("Total %d faults in the fault list\n", $#identification_results+1);
-printf OUTF ("\tThe number of  detected fault is %d. ( %0.2f [%] )\n", ($#identification_results+1-$redundant_fault), ($#identification_results+1-$redundant_fault)/($#identification_results+1)*100 );
-printf OUTF ("\tThe number of redandant fault is $redundant_fault. ( %0.2f [%] )\n", $redundant_fault/($#identification_results+1)*100 );
-close(OUTF);
+printf OUTCSV ("Total %d faults in the fault list\n", $#identification_results+1);
+printf OUTCSV ("\tThe number of  detected fault is %d. ( %0.2f [%] )\n", ($#identification_results+1-$redundant_fault), ($#identification_results+1-$redundant_fault)/($#identification_results+1)*100 );
+printf OUTCSV ("\tThe number of redandant fault is $redundant_fault. ( %0.2f [%] )\n", $redundant_fault/($#identification_results+1)*100 );
+close(OUTCSV);
 
 printf("Total %d faults in the fault list\n", $#identification_results+1);
 printf("\tElapsed time is %0.3f sec\n", Time::HiRes::time - $start_time);
@@ -180,6 +190,46 @@ sub readEquivalentCheckResult() {
 	return $pattern;
 }
 
+
+# timeコマンドの実行結果を読み込んでcsv形式ではき出します
+sub getTimeCommandResult() {
+	my $exec_log = $_[0];
+	if( $exec_log =~ /([\d\.:]+)user\s*([\d\.:]+)system\s*([\d\.:]+)+elapsed.*([\d\.]+)maxresident/ ) {
+		my $user = $1;
+		my $system = $2;
+		my $elapsed = $3;
+		my $memory = $4;
+		return ( "$user, $system, $elapsed, $memory" );
+	}
+	exit 0;
+	return $FALSE;
+}
+
+
+sub normalizeTime() {
+	my $sec = $_[0];
+	if( $sec < 60 ) {
+		return sprintf("%.2fs", $sec);
+	}
+	$sec /= 60;
+	if( $sec < 60 ) {
+		return sprintf("%.2fm", $sec);
+	}
+	$sec /= 60;
+	if( $sec < 24 ) {
+		return sprintf("%.2fh", $sec);
+	}
+	$sec /= 24;
+	if( $sec < 30 ) {
+		return sprintf("%.2fd", $sec);
+	}
+	$sec /= 30;
+	if( $sec < 12 ) {
+		return sprintf("%.2f[month]", $sec);
+	}
+	$sec /= 12;
+	return sprintf("%.2f[year]", $sec);
+}
 
 
 sub writeExpansionConf() {

@@ -314,33 +314,39 @@ public class Verilog {
 		boolean use_ec = ( value==0 || value==1 );
 		ArrayList<String> new_model = getModuleWithNewName(new_module_name);
 		String pio_wire = signal.split("\\[")[0];
-		String gate = _getGatePort(signal)[0];
-		String port = _getGatePort(signal)[1];
-		String tp_name = getTestPointName(signal);
+		String gate = _getGatePort(signal)[0]; // U412
+		String port = _getGatePort(signal)[1]; // A
+		String tp_name = getTestPointName(signal); // tp_U412_A
 		String sa_name = getStuckAtName(signal);
 
 		boolean output_def_flag = true;
 		Pattern signal_gate_regex = Pattern.compile("\\s*(\\w+)\\s+"+gate+"\\s*\\((.+)\\)\\s*;.*");
 		Pattern signal_wire_regex = Pattern.compile("\\s*(wire|input|output)(.*"+pio_wire+".*)");
+		Pattern signal_ppi_regex = Pattern.compile("\\s*assign\\s+(\\S+)\\s*=\\s*ppi_"+gate+"\\s*;.*");
+		Pattern signal_ppo_regex = Pattern.compile("\\s*assign\\s+ppo_"+gate+"\\s*=\\s*(\\S+)\\s*;.*");
 		for( int i=0; i<new_model.size(); i++ ) {
 			String s = new_model.get(i);
 			Matcher modname_macher = modname_regex.matcher(s);
 			Matcher signal_gate_macher = signal_gate_regex.matcher(s);
 			Matcher signal_wire_macher = signal_wire_regex.matcher(s);
+			Matcher signal_ppi_macher = signal_ppi_regex.matcher(s);
+			Matcher signal_ppo_macher = signal_ppo_regex.matcher(s);
 			if( modname_macher.matches() ) {
+				// モジュール宣言にtp_を追加する
 				if( use_ec ) {
 					s = "module "+new_module_name+" ("+modname_macher.group(2)+", "+tp_name+", "+sa_name+" );";
 				} else {
 					s = "module "+new_module_name+" ("+modname_macher.group(2)+", "+tp_name+" );";
 				}
 			} else if( signal_gate_macher.matches() ) {
+				// 通常のゲートに入ってる信号線ならバグは少ない
 				Matcher port_macher = Pattern.compile(".*\\."+port+"\\((.+?)\\).*").matcher(signal_gate_macher.group(2));
 				if( port_macher.matches() ) {
 					s += "\n";
-					s += "assign " + tp_name + " = " + port_macher.group(1) + ";";
+					s += "\tassign " + tp_name + " = " + port_macher.group(1) + ";";
 					if( use_ec ) {
 						s += "\n";
-						s += "assign " + sa_name + " = 1'b" + value + ";";
+						s += "\tassign " + sa_name + " = 1'b" + value + ";";
 					}
 				} else {
 					System.out.println("Warning: ゲートとポートの対応がとれませんでした");
@@ -349,13 +355,21 @@ public class Verilog {
 					System.out.println(s);
 				}
 			} else if( signal_wire_macher.matches() ) {
+				// wire宣言されてたり、もともとあった外部入出力に対しては困ってしまいますね
+				// PPIとかも反応してしまうけど、下の条件で飛ばすのでOK！！！！（ダメだ、対応する気力が足りない
 				String[] wires = signal_wire_macher.group(2).replaceAll("\\s+", "").replaceAll(";", "").replaceAll("\\[\\d+:\\d+\\]", "").split(",");
 				for( String w: wires ) {
 					if( w.equals(pio_wire)) {
 						s += "\n";
-						s += "assign " + tp_name + " = " + signal + ";";
+						s += "\tassign " + tp_name + " = " + signal + ";";
 					}
 				}
+			} else if( signal_ppi_macher.matches() && port.matches("Q[N]?") ) {
+				s += "\n";
+				s += "\tassign " + tp_name + " = ppi_"+gate+" ;";
+			} else if( signal_ppo_macher.matches() && port.equals("D") ) {
+				s += "\n";
+				s += "\tassign " + tp_name + " = "+signal_ppo_macher.group(1)+" ;";
 			} else if( s.matches("\\s*output\\s+.+\\s*;.*") && output_def_flag ) {
 				output_def_flag = false;
 				String temp = s;
@@ -393,10 +407,14 @@ public class Verilog {
 
 		Pattern signal_gate_regex = Pattern.compile("\\s*(\\w+)\\s+"+gate+"\\s*\\((.+)\\)\\s*;.*");
 		Pattern signal_wire_regex = Pattern.compile("\\s*(wire|input|output)(.*"+pio_wire+".*)");
+		Pattern signal_ppi_regex = Pattern.compile("\\s*assign\\s+(\\S+)\\s*=\\s*ppi_"+gate+"\\s*;.*");
+		Pattern signal_ppo_regex = Pattern.compile("\\s*assign\\s+ppo_"+gate+"\\s*=\\s*(\\S+)\\s*;.*");
 		for( int i=0; i<new_model.size(); i++ ) {
 			String s = new_model.get(i);
 			Matcher signal_gate_macher = signal_gate_regex.matcher(s);
 			Matcher signal_wire_macher = signal_wire_regex.matcher(s);
+			Matcher signal_ppi_macher = signal_ppi_regex.matcher(s);
+			Matcher signal_ppo_macher = signal_ppo_regex.matcher(s);
 			if( signal_gate_macher.matches() ) {
 				Matcher port_macher = Pattern.compile(".*\\."+port+"\\((.+?)\\).*").matcher(signal_gate_macher.group(2));
 				if( port_macher.matches() ) {
@@ -432,6 +450,10 @@ public class Verilog {
 						}
 					}
 				}
+			} else if( signal_ppi_macher.matches() && port.matches("Q[N]?") ) {
+				s = "\tassign "+signal_ppi_macher.group(1)+" = 1'b" + value + ";";
+			} else if( signal_ppo_macher.matches() && port.equals("D") ) {
+				s = "\tassign ppo_"+gate+" = 1'b" + value + ";";
 			} else {
 				continue;
 			}

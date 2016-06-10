@@ -5,8 +5,9 @@
 use strict;
 use Time::HiRes;
 use Time::Piece;
+use POSIX qw ( WNOHANG SIGTERM SIGKILL SIGINT );
 
-my $usage = "usage: RedundantFaultIdentification <fault_list.flt>";
+my $usage = "usage: RedundantFaultIdentification <fault_list.flt> [-d] [-timeout=<seconds>]";
 my $program = "Redundant fault Identification using Formality";
 #my $version = "$program ver-1.0a   @ Apr. 22, 2016"; # とりあえず完成
 #my $version = "$program ver-1.1a   @ Apr. 27, 2016"; # どれぐらい終わったか見せる
@@ -15,13 +16,16 @@ my $program = "Redundant fault Identification using Formality";
 #my $version = "$program ver-1.2.1a @ May. 9, 2016"; # 冗長判定結果の収集方法が間違えていたので修正
 #my $version = "$program ver-1.2.2 @ May. 20, 2016"; # Warningをだしていたときも出力するようにする
 #my $version = "$program ver-1.2.3 @ May. 23, 2016"; # use-primary-ioの機能を追加
-my $version = "$program ver-1.3 @ May. 26, 2016"; # 各実行のCPU timeを取得する機能を追加
+#my $version = "$program ver-1.3 @ May. 26, 2016"; # 各実行のCPU timeを取得する機能を追加
+my $version = "$program ver-1.4 @ Jun. 3, 2016"; # Formalityのタイムアウト処理を追加
 
 my $top_module = substr($ARGV[0], 0, index($ARGV[0], "_"));
 my $output_file = "k-fm_summary_$top_module.csv";
 my $clock_pins = "clock, reset";
+my $timeout = 0; # 無制限に実行する
 
 my $redundant_fault = 0;
+my $notdetected_fault = 0;
 my @identification_results = ();
 my $start_time = Time::HiRes::time;
 my $FALSE = 0;
@@ -32,8 +36,21 @@ if( $ARGV[0] eq "" ) {
 	print("$usage\n");
 	exit(0);
 }
-if( $ARGV[1] eq "-d" ) {
-	$DEBUG = $TRUE;
+
+foreach my $a ( @ARGV ) {
+	if( $a eq "-d" ) {
+		$DEBUG = $TRUE;
+		print("[Info] Exec in debug mode.\n");
+	} elsif( $a =~ /-timeout=(\d+)/ ) {
+		$timeout = $1;
+		print("[Info] Timeout is set to $timeout seconds.\n");
+	} elsif( -f $a ) {
+		print("[Info] Target fault list is $a.\n");
+	} else {
+		print("Error: Cannot analyze option.\n");
+		print("$usage\n");
+		exit(0);
+	}
 }
 if( $top_module eq "b04" || $top_module eq "b05" || $top_module eq "b08" || $top_module eq "b15" ) {
 	$clock_pins = "CLOCK, RESET";
@@ -97,29 +114,24 @@ foreach my $c_fault ( @fault_list ) {
 			}
 			&writeFormalityTCL("fm_check.tcl",    $top_module, $s_fault );
 			printf("[%5d/%5d] $s_fault -> ", $index_fm_check, $no_fm_check);
-			my $fm_log = "";
-			if( $DEBUG ) {
-				system("fm_shell -f fm_check.tcl");
+			my $in_time ;
+			($fm_time, $in_time) = &execFormality( $timeout );
+			if( $in_time == $TRUE ) {
+				$pattern = &readEquivalentCheckResult( $top_module, $s_fault );
 			} else {
-#				$fm_log = `fm_shell -f fm_check.tcl`;
-				open(CMD, "/usr/bin/time fm_shell -f fm_check.tcl 2>&1 |");
-				$fm_log = join("",<CMD>);
-				close(CMD);
-				$fm_time = &getTimeCommandResult($fm_log);
+				$pattern = "notdetected";
 			}
-			if( index($fm_log, "Error:") >= 0 ) {
-				print("Some error occured in executing fm_shell\n");
-				print("$fm_log\n");
-				exit(0);
-			}
-			$pattern = &readEquivalentCheckResult( $top_module, $s_fault );
 			$prev_pattern = $pattern;
 			my $now = Time::HiRes::time;
 			my $rate = $index_fm_check/$no_fm_check; # 処理済みの割合
 			my $rem = ($now-$start_time)*(1-$rate)/$rate; # 残りの予測実時間(s)
 			my $t = localtime();
 			$t += int($rem);
-			printf("%s (in %0.3fs)\n", ($pattern eq "redundant")?"redundant":"detectable", $now-$prev_time);
+			if( $pattern eq "notdetected" || $pattern eq "redundant" ) {
+				printf("%s (in %0.3fs)\n", $pattern, $now-$prev_time);
+			} else {
+				printf("%s (in %0.3fs)\n", "detected", $now-$prev_time);
+			}
 			printf("[%5.2f\%] Estimated finish time is %s (about %s to go)\n", $rate*100, $t->strftime('%m/%d, %Y %H:%M:%S'), &normalizeTime($rem) );
 			$prev_time = $now;
 			$index_fm_check++;
@@ -127,23 +139,81 @@ foreach my $c_fault ( @fault_list ) {
 		if( index($pattern, "redundant") == 0 ) {
 			$redundant_fault++;
 		}
+		if( index($pattern, "notdetected") == 0 ) {
+			$notdetected_fault++;
+		}
 		print OUTCSV ("$s_fault, $pattern, $te_time, $fm_time\n");
 		push( @identification_results, "$s_fault, $pattern, $te_time, $fm_time" );
 	}
 }
 
 printf OUTCSV ("Total %d faults in the fault list\n", $#identification_results+1);
-printf OUTCSV ("\tThe number of  detected fault is %d. ( %0.2f [%] )\n", ($#identification_results+1-$redundant_fault), ($#identification_results+1-$redundant_fault)/($#identification_results+1)*100 );
+printf OUTCSV ("\tThe number of  detected fault is %d. ( %0.2f [%] )\n", ($#identification_results+1-$redundant_fault-$notdetected_fault), ($#identification_results+1-$redundant_fault-$notdetected_fault)/($#identification_results+1)*100 );
 printf OUTCSV ("\tThe number of redandant fault is $redundant_fault. ( %0.2f [%] )\n", $redundant_fault/($#identification_results+1)*100 );
+printf OUTCSV ("\tThe number of aborted fault is $notdetected_fault. ( %0.2f [%] )\n", $notdetected_fault/($#identification_results+1)*100 );
 close(OUTCSV);
 
 printf("Total %d faults in the fault list\n", $#identification_results+1);
 printf("\tElapsed time is %0.3f sec\n", Time::HiRes::time - $start_time);
-printf("\tThe number of  detected fault is %d. ( %0.2f [%] )\n", ($#identification_results+1-$redundant_fault), ($#identification_results+1-$redundant_fault)/($#identification_results+1)*100 );
+printf("\tThe number of  detected fault is %d. ( %0.2f [%] )\n", ($#identification_results+1-$redundant_fault-$notdetected_fault), ($#identification_results+1-$redundant_fault-$notdetected_fault)/($#identification_results+1)*100 );
 printf("\tThe number of redandant fault is $redundant_fault. ( %0.2f [%] )\n", $redundant_fault/($#identification_results+1)*100 );
+printf("\tThe number of aborted fault is $notdetected_fault. ( %0.2f [%] )\n", $notdetected_fault/($#identification_results+1)*100 );
 
 exit(0);
 
+
+sub execFormality() {
+	my $timeout = $_[0]; # seconds
+	my $fm_logfile = "fm_result.log";
+	my $in_time = $TRUE;
+	if( $DEBUG ) {
+		system("fm_shell -f fm_check.tcl");
+	} else {
+#		$fm_log = `fm_shell -f fm_check.tcl`;
+		my $pid = fork();
+		unless(defined($pid)) { die("Cannot fork\n"); }
+		if( $pid ==0 ) {
+			# 子プロセスの処理
+			my $cmd = "/usr/bin/time fm_shell -f fm_check.tcl >& $fm_logfile";
+			exec($cmd);
+			print("$cmd finish.");
+			exit(0);
+		} else {
+			# 親プロセスの処理
+			eval {
+				local $SIG{ALRM} = sub {
+					$in_time = $FALSE; # timeout
+				};
+				alarm($timeout);
+				while( $in_time ) {
+					last if( waitpid($pid, WNOHANG) );
+					sleep(1);
+				}
+			};
+			if( $@ ) {
+				print("Error: some error occured in executing forked fm_shell.\n" . $@);
+				exit(0);
+			}
+			unless( $in_time ) {
+				print("timeout! (PID=$pid)\n");
+				kill( SIGKILL, -$pid );
+				print("Wait until pid=$pid is dead... ");
+				waitpid($pid,0);
+				print("Dead!\n");
+				return($timeout, $FALSE);
+			}
+		}
+	}
+	my $fm_log = `cat $fm_logfile`;
+	unlink($fm_logfile);
+	if( index($fm_log, "Error:") >= 0 ) {
+		print("Some error occured in executing fm_shell\n");
+		print("$fm_log\n");
+		exit(0);
+	}
+	my $fm_time = &getTimeCommandResult($fm_log);
+	return($fm_time, $TRUE);
+}
 
 sub readEquivalentCheckResult() {
 	my $top   = $_[0];
@@ -201,8 +271,9 @@ sub getTimeCommandResult() {
 		my $memory = $4;
 		return ( "$user, $system, $elapsed, $memory" );
 	}
-	exit 0;
-	return $FALSE;
+	print("Cannot read results of time command\n.$exec_log\n");
+	exit(0);
+#	return ( "$timeout, 0, 0, 0" );
 }
 
 

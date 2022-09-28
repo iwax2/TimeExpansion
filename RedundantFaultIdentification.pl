@@ -17,7 +17,8 @@ my $program = "Redundant fault Identification using Formality";
 #my $version = "$program ver-1.2.2 @ May. 20, 2016"; # Warningをだしていたときも出力するようにする
 #my $version = "$program ver-1.2.3 @ May. 23, 2016"; # use-primary-ioの機能を追加
 #my $version = "$program ver-1.3 @ May. 26, 2016"; # 各実行のCPU timeを取得する機能を追加
-my $version = "$program ver-1.4 @ Jun. 3, 2016"; # Formalityのタイムアウト処理を追加
+#my $version = "$program ver-1.4 @ Jun. 3, 2016"; # Formalityのタイムアウト処理を追加
+my $version = "$program ver-1.4.1 @ Jun. 16, 2016"; # Abort判定がうまくいっていなかったのを修正
 
 my $top_module = substr($ARGV[0], 0, index($ARGV[0], "_"));
 my $output_file = "k-fm_summary_$top_module.csv";
@@ -167,7 +168,8 @@ sub execFormality() {
 	my $fm_logfile = "fm_result.log";
 	my $in_time = $TRUE;
 	if( $DEBUG ) {
-		system("fm_shell -f fm_check.tcl");
+		system("/usr/bin/time fm_shell -f fm_check.tcl");
+		return(0, $TRUE);
 	} else {
 #		$fm_log = `fm_shell -f fm_check.tcl`;
 		my $pid = fork();
@@ -218,12 +220,33 @@ sub execFormality() {
 sub readEquivalentCheckResult() {
 	my $top   = $_[0];
 	my $fault = $_[1];
+	my $status_log = "report_status_".$top."_$fault.log";
 	my $failing_log = "report_failing_".$top."_$fault.log";
 	my $pattern_log = "test_patterns_".$top."_$fault.v";
 	my $pin = 0;
 	my $pattern = "redundant";
 	my $fail_out = "";
-	open(INF, $failing_log ) or die("Cannot open file, $failing_log\n");
+	open(INS, $status_log ) or die("Cannot open report_status log, $status_log");
+	while(<INS>) {
+		my $line = $_;
+		chomp($line);
+		if( $line =~ /Number of Aborting Cells :\s*(\d+)/ ) {
+			my $no_aborted = $1;
+			if( $no_aborted == 0 ) {
+				last;
+			} elsif( $no_aborted > 0 ) {
+				close(INS);
+				return "notdetected";
+			} else {
+				die("Error: cannot analyze report_status log, $line\n");
+			}
+		}
+	}
+	close(INS);
+
+	unless ( open(INF, $failing_log ) ) {
+		return "notdetected";
+	}
 	while(<INF>) {
 		my $line = $_;
 		chomp($line);
@@ -254,6 +277,7 @@ sub readEquivalentCheckResult() {
 		close(INP);
 	}
 	unless( $DEBUG ) {
+		unlink $status_log;
 		unlink $failing_log;
 		unlink $pattern_log;
 	}
@@ -354,6 +378,7 @@ sub writeFormalityTCL() {
 	my $output_verilog = $top."_bs_net.v";
 	my $ref_module = $top."_bs_ref";
 	my $imp_module = $top."_bs_imp";
+	my $status_log = "report_status_".$top."_$fault.log";
 	my $failing_log = "report_failing_".$top."_$fault.log";
 	my $pattern_log = "test_patterns_".$top."_$fault.v";
 
@@ -367,6 +392,7 @@ set_top $imp_module
 match
 #report_unmatched_points > b04_form_unmatched_points_001.txt
 verify
+report_status > $status_log
 report_failing_points > $failing_log
 write_failing_patterns -verilog -replace $pattern_log
 exit
